@@ -1,8 +1,65 @@
-import { Link } from 'react-router-dom';
+/**
+ * Login Page
+ * 
+ * Supabase Authentication - NO MOCKS
+ * Real authentication with JWT tokens
+ */
+
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import useRedirectIfAuthenticated from '../hooks/useRedirectIfAuthenticated';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const { login, loading } = useAuth();
+  
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect if already logged in
+  useRedirectIfAuthenticated();
+
+  /**
+   * Handle form submission
+   */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      // Validate inputs
+      if (!email.trim()) {
+        setError('Please enter your email address');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!password) {
+        setError('Please enter your password');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Attempt login with Supabase
+      const result = await login(email, password);
+      
+      if (result.success) {
+        // Redirect to dashboard on successful login
+        navigate('/dashboard');
+      } else {
+        setError(result.error || 'Login failed. Please try again.');
+      }
+    } catch (err) {
+      setError(err.message || 'An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 font-sans flex flex-col w-full overflow-x-hidden">
@@ -31,9 +88,15 @@ export default function LoginPage() {
               Sign in to access your FluxLab account.
             </p>
 
-            {/* Form */}
-            <form className="space-y-5">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
 
+            {/* Form */}
+            <form className="space-y-5" onSubmit={handleSubmit}>
               {/* Email */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -43,7 +106,10 @@ export default function LoginPage() {
                 <input
                   type="email"
                   placeholder="your.email@example.com"
-                  className="w-full px-4 py-3 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -57,12 +123,16 @@ export default function LoginPage() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••••"
-                    className="w-full px-4 py-3 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isSubmitting}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
                   >
                     {showPassword ? '🙈' : '👁️'}
                   </button>
@@ -71,15 +141,25 @@ export default function LoginPage() {
 
               {/* Forgot Password */}
               <div className="text-right pt-2">
-                <a href="#" className="text-sm text-emerald-600 hover:underline">Forgot password?</a>
+                <a href="#forgot" className="text-sm text-emerald-600 hover:underline">
+                  Forgot password?
+                </a>
               </div>
 
               {/* Submit Button */}
               <button
-                type="button"
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded transition mt-6 tracking-wide"
+                type="submit"
+                disabled={isSubmitting || loading}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white font-bold py-3 px-4 rounded transition mt-6 tracking-wide disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                SIGN IN
+                {isSubmitting || loading ? (
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    SIGNING IN...
+                  </>
+                ) : (
+                  'SIGN IN'
+                )}
               </button>
             </form>
 
@@ -94,7 +174,11 @@ export default function LoginPage() {
             </div>
 
             {/* SSO Button */}
-            <button className="w-full border-2 border-gray-200 hover:border-gray-300 text-gray-900 font-semibold py-3 px-4 rounded transition flex items-center justify-center gap-2">
+            <button
+              type="button"
+              disabled={isSubmitting || loading}
+              className="w-full border-2 border-gray-200 hover:border-gray-300 text-gray-900 font-semibold py-3 px-4 rounded transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span>⚙️</span>
               Sign in with SAML / SSO
             </button>
@@ -106,7 +190,7 @@ export default function LoginPage() {
             </p>
 
             {/* Back Link */}
-            <div className="text-center mt-8">
+            <div className="text-center mt-6">
               <Link
                 to="/"
                 className="text-sm text-gray-400 hover:text-gray-600 transition inline-flex items-center gap-1"
