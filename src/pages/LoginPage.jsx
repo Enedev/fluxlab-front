@@ -25,24 +25,24 @@ export default function LoginPage() {
           <div className="bg-white rounded-lg shadow-sm p-8 md:p-10">
             {/* Header */}
             <h1 className="text-3xl font-bold text-center mb-2 text-gray-900">
-              Join FluxLab
+              Welcome Back
             </h1>
             <p className="text-center text-gray-600 mb-8 text-sm">
-              Start your 14-day free trial. No credit card required.
+              Sign in to access your FluxLab account.
             </p>
 
             {/* Form */}
             <form className="space-y-5">
 
-              {/* Institutional Email */}
+              {/* Email */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   <span>✉️</span>
-                  INSTITUTIONAL EMAIL
+                  EMAIL
                 </label>
                 <input
                   type="email"
-                  placeholder="julian.v@biotech-research.org"
+                  placeholder="your.email@example.com"
                   className="w-full px-4 py-3 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
                 />
               </div>
@@ -69,12 +69,9 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Terms */}
-              <div className="text-xs text-gray-600 text-center pt-2">
-                By signing up, you agree to the{' '}
-                <a href="#" className="text-emerald-600 hover:underline">Terms of Service</a>
-                {' '}and{' '}
-                <a href="#" className="text-emerald-600 hover:underline">Privacy Policy</a>.
+              {/* Forgot Password */}
+              <div className="text-right pt-2">
+                <a href="#" className="text-sm text-emerald-600 hover:underline">Forgot password?</a>
               </div>
 
               {/* Submit Button */}
@@ -82,7 +79,7 @@ export default function LoginPage() {
                 type="button"
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded transition mt-6 tracking-wide"
               >
-                CREATE ACCOUNT
+                SIGN IN
               </button>
             </form>
 
@@ -92,22 +89,20 @@ export default function LoginPage() {
                 <div className="w-full border-t border-gray-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">ENTERPRISE VALIDATION</span>
+                <span className="px-2 bg-white text-gray-500">ENTERPRISE SIGN-IN</span>
               </div>
             </div>
 
             {/* SSO Button */}
             <button className="w-full border-2 border-gray-200 hover:border-gray-300 text-gray-900 font-semibold py-3 px-4 rounded transition flex items-center justify-center gap-2">
               <span>⚙️</span>
-              Sign up with SAML / SSO
+              Sign in with SAML / SSO
             </button>
 
-            {/* Login Link */}
+            {/* Registration Info */}
             <p className="text-center text-gray-600 mt-8 text-sm">
-              Already have an account?{' '}
-              <Link to="/login" className="text-emerald-600 hover:underline font-semibold">
-                Log In
-              </Link>
+              Don't have an account?{' '}
+              <span className="text-gray-700 font-semibold">Contact your administrator</span>
             </p>
 
             {/* Back Link */}

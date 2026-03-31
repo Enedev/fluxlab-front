@@ -19,11 +19,8 @@ export default function WelcomePage() {
             <li><a href="#about" className="text-gray-700 hover:text-gray-900">About</a></li>
           </ul>
           <div className="flex gap-4">
-            <Link to="/login" className="text-gray-700 hover:text-gray-900 font-medium">
-              Login
-            </Link>
             <Link to="/login" className="bg-emerald-500 text-white px-6 py-2 rounded hover:bg-emerald-600 font-medium">
-              Get Started
+              Login
             </Link>
           </div>
         </div>
@@ -49,7 +46,7 @@ export default function WelcomePage() {
                 to="/login"
                 className="bg-emerald-500 text-white px-8 py-3 rounded font-semibold hover:bg-emerald-600 transition"
               >
-                Get Started
+                Sign In
               </Link>
             </div>
           </div>
@@ -196,7 +193,7 @@ export default function WelcomePage() {
               to="/login"
               className="bg-black text-white px-8 py-3 rounded font-semibold hover:bg-gray-800 transition"
             >
-              Start 14-Day Free Trial
+              Sign In to FluxLab
             </Link>
             <button className="border-2 border-white text-white px-8 py-3 rounded font-semibold hover:bg-white hover:text-emerald-600 transition">
               Talk to Sales
