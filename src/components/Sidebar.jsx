@@ -8,6 +8,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/logoConFondo.jpeg';
 
 const menuItems = [
   {
@@ -19,49 +20,49 @@ const menuItems = [
   },
   {
     id: 'clients',
-    label: 'Clients',
+    label: 'Clientes',
     icon: '👥',
     path: '/clients',
     roles: ['authenticated', 'admin', 'user']
   },
   {
     id: 'users',
-    label: 'User Management',
+    label: 'Gestión de Usuarios',
     icon: '👤',
     path: '/users',
     roles: ['admin']
   },
   {
     id: 'projects',
-    label: 'Projects',
+    label: 'Projectos',
     icon: '📁',
     path: '/projects',
     roles: ['authenticated', 'admin', 'user']
   },
   {
     id: 'samples',
-    label: 'Samples',
+    label: 'Muestras',
     icon: '🧪',
     path: '/samples',
     roles: ['authenticated', 'admin', 'user']
   },
   {
     id: 'tests',
-    label: 'Tests',
+    label: 'Pruebas',
     icon: '🔬',
     path: '/tests',
     roles: ['authenticated', 'admin', 'user']
   },
   {
     id: 'reports',
-    label: 'Reports',
+    label: 'Reportes',
     icon: '📋',
     path: '/reports',
     roles: ['authenticated', 'admin', 'user']
   },
   {
     id: 'documents',
-    label: 'Documents',
+    label: 'Documentos',
     icon: '📄',
     path: '/documents',
     roles: ['authenticated', 'admin', 'user']
@@ -117,14 +118,14 @@ export function Sidebar() {
         {!collapsed && (
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-black rounded flex items-center justify-center">
-              <span className="text-white text-xs font-bold">FL</span>
+              <img src={logo} alt="FluxLab Logo" className="w-8 h-13 rounded-full object-cover"/>
             </div>
             <span className="font-bold text-lg text-gray-900">FluxLab</span>
           </div>
         )}
         {collapsed && (
           <div className="w-8 h-8 bg-black rounded flex items-center justify-center">
-            <span className="text-white text-xs font-bold">FL</span>
+            <img src={logo} alt="FluxLab Logo" className="w-8 h-13 rounded-full object-cover"/>
           </div>
         )}
         <button

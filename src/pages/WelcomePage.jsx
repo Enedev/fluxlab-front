@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
 import logo from '../assets/logoConFondo.jpeg';
+import foto from '../assets/sobreNosotros.png';
+import Button from '../components/Button';
 
 export default function WelcomePage() {
   return (
@@ -8,52 +9,58 @@ export default function WelcomePage() {
       <nav className="w-full bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="FluxLab Logo" className="w-8 h-13 rounded-full object-cover"/>
+            <img src={logo} alt="FluxLab Logo" className="w-8 h-13 rounded-full object-cover" />
             <span className="text-lg font-bold">FluxLab</span>
           </div>
           <ul className="hidden md:flex gap-8 items-center">
-            <li><a href="#features" className="text-gray-700 hover:text-gray-900">Features</a></li>
-            <li><a href="#solutions" className="text-gray-700 hover:text-gray-900">Solutions</a></li>
-            <li><a href="#pricing" className="text-gray-700 hover:text-gray-900">Pricing</a></li>
-            <li><a href="#about" className="text-gray-700 hover:text-gray-900">About</a></li>
+            <li><a Nav href="#features" className="text-gray-700 hover:text-gray-900">Características</a></li>
+            <li><a Nav href="#about" className="text-gray-700 hover:text-gray-900">Sobre nosotros</a></li>
           </ul>
           <div className="flex gap-4">
-            <Link to="/login" className="bg-emerald-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-400/50">
+            <Button to="/login">
               Iniciar Sesión
-            </Link>
-          </div>
+            </Button>
+          </div> 
         </div>
-      </nav>
+      </nav>      
 
       {/* Hero Section */}
-      <div className="flex flex-col items-center justify-center text-center px-4 py-16 min-h-[80vh]">
+      <div className="relative flex flex-col items-center justify-center text-center px-4 py-16 min-h-[80vh] overflow-hidden bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] bg-[length:16px_16px]">
+        
+        {/* Blobs orgánicos de fondo - Biotecnología */}
+        <div className="absolute top-10 left-10 w-72 h-72 bg-emerald-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-5 animate-pulse" style={{animationDelay: '2s'}}></div>
+        <div className="absolute -bottom-32 left-1/2 transform -translate-x-1/2 w-80 h-80 bg-emerald-500 rounded-full mix-blend-multiply filter blur-3xl opacity-5"></div>
 
-        {/* Badge de New Release */}
-        <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full mb-6">
-          NEW RELEASE V0.1
-        </span>
+        <div className="relative z-10">
+          {/* Badge de New Release */}
+          <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full mb-6 inline-block">
+            - - - - - - - - -
+          </span>
 
-        {/*Títulos*/}
-        <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight max-w-3xl">
-          FluxLab: <br />
-          <span className="text-emerald-500">El futuro de los Software LIMS</span>
-        </h1>
+          {/*Títulos*/}
+          <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight max-w-3xl">
+            FluxLab: <br />
+            <span className="text-emerald-500">El futuro de los Software LIMS</span>
+          </h1>
 
-        <p className="mt-6 text-lg text-gray-600 max-w-2xl">
-          Organiza, gestiona y optimiza tus muestras de laboratorio con una mejor visualización
-          de tus datos. Diseñado para la precisión científica.
-        </p>
+          <p className="mt-6 text-lg text-gray-600 max-w-2xl">
+            Organiza, gestiona y optimiza tus muestras de laboratorio con una mejor visualización
+            de tus datos. Diseñado para la precisión científica.
+          </p>
 
-        {/* BLOQUE DE LOGIN (Botón + Social)*/}
-        <div className="flex flex-col items-center w-full max-w-[270px] mt-10">
-          <Link
+          {/* BLOQUE DE LOGIN (Botón + Social)*/}
+          <div className="flex justify-center w-full mt-10">
+          <Button
             to="/login"
-            className="bg-emerald-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-emerald-600 transition w-full text-center shadow-lg shadow-emerald-200 mb-6"
+            className="text-center mb-6"
           >
-            Iniciar Sesión
-          </Link>
+            Comienza ahora con una nueva experiencia
+          </Button>
 
-          {/* Separador */}
+          {/*
+            // Comentados por ahora, pero listos para ser implementados con Supabase Social Auth
+          // Separador 
           <div className="w-full relative flex items-center justify-center mb-6">
             <div className="flex-grow border-t border-gray-300"></div>
             <span className="flex-shrink mx-3 text-gray-400 text-[10px] uppercase tracking-widest font-bold">
@@ -62,7 +69,7 @@ export default function WelcomePage() {
             <div className="flex-grow border-t border-gray-300"></div>
           </div>
 
-          {/* Botones de Google y Microsoft */}
+          // Botones de Google y Microsoft 
           <div className="flex gap-4 justify-center">
             <button className="flex items-center justify-center rounded-xl bg-[#1A1A1A] hover:bg-black transition-all shadow-lg w-14 h-14 group">
               <img
@@ -80,8 +87,11 @@ export default function WelcomePage() {
               />
             </button>
           </div>
+          */}
+
         </div>
       </div>
+    </div>
 
       {/* Featured Clients */}
       <section className="w-full bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -194,54 +204,49 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="w-full bg-gradient-to-r from-emerald-400 to-emerald-600 py-16 px-4 text-center">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold text-white mb-4">
-            Ready to Modernize Your Research?
-          </h2>
-          <p className="text-emerald-50 mb-8 text-lg">
-            Join over 500+ laboratories worldwide that trust FluxLab for their mission-critical management.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/login"
-              className="bg-black text-white px-8 py-3 rounded font-semibold hover:bg-gray-800 transition"
-            >
-              Sign In to FluxLab
-            </Link>
-            <button className="border-2 border-white text-white px-8 py-3 rounded font-semibold hover:bg-white hover:text-emerald-600 transition">
-              Talk to Sales
-            </button>
+      {/* Sección Sobre Nosotros (About Us) */}
+      <section id="about" className="w-full bg-gradient-to-r from-emerald-400 to-emerald-600 py-16 px-4">
+        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+
+          {/* Columna de Texto */}
+          <div className="space-y-6">
+            <span className="text-emerald-1000 font-semibold text-sm tracking-wider uppercase">Sobre nosotros</span>
+            <h2 className="text-4xl font-bold text-white leading-tight">
+              Impulsando la Precisión Científica a través de la Inteligencia de Datos
+            </h2>
+            <p className="text-lg text-emerald-1000 leading-relaxed">
+              En FluxLab, nacimos de la intersección entre la biotecnología ambiental y la ingeniería de sistemas. Nuestra misión es revolucionar la gestión de laboratorios tradicionales (LIMS), proporcionando una plataforma digital centralizada que garantiza la integridad, trazabilidad y optimización de cada muestra.
+            </p>
+            <p className="text-lg text-emerald-1000 leading-relaxed">
+              No solo organizamos datos; transformamos la información en inteligencia predictiva para anticipar desafíos y acelerar descubrimientos científicos.
+            </p>
           </div>
+
+          {/* Columna de Imagen*/}
+          <div className="relative aspect-square bg-gray-100 rounded-3xl overflow-hidden shadow-xl border border-gray-200">
+            <img
+              src={foto}
+              alt="Visualización digital de datos a través de un microscopio moderno en FluxLab"
+              className="w-full h-full object-cover"
+            />
+            {/* Sutil resplandor esmeralda de fondo */}
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-100/50 rounded-full blur-3xl z-0"></div>
+          </div>
+
         </div>
       </section>
 
       {/* Footer */}
       <footer className="w-full bg-gray-900 text-gray-400 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="flex flex-col items-center mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center">
                   <img src={logo} alt="FluxLab Logo" className="w-8 h-13 rounded-full object-cover" />
                 </div>
                 <span className="text-white font-bold">FluxLab</span>
               </div>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition">Contact Support</a></li>
-                <li><a href="#" className="hover:text-white transition">Security Compliance</a></li>
-              </ul>
             </div>
           </div>
           <div className="border-t border-gray-700 pt-8 text-center text-sm">

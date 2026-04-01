@@ -39,7 +39,7 @@ export function Navbar() {
           <div className="relative w-full max-w-2xl">
             <input
               type="text"
-              placeholder="Search samples, projects, or compliance data..."
+              placeholder="Buscar muestras, proyectos o datos..."
               className="w-full px-4 py-2 pl-10 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
             />
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">

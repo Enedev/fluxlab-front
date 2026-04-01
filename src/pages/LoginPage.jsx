@@ -163,8 +163,10 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            {/* Divider */}
+            
+            {/*
+            // Comentados por ahora, pero listos para ser implementados con Supabase Social Auth
+            // Divider 
             <div className="relative my-8">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200"></div>
@@ -174,7 +176,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Botones de Google y Microsoft */}
+            // Botones de Google y Microsoft
             <div className="flex gap-4 justify-center">
             <button className="flex items-center justify-center rounded-xl bg-[#1A1A1A] hover:bg-black transition-all shadow-lg w-14 h-14 group">
               <img
@@ -192,7 +194,8 @@ export default function LoginPage() {
               />
             </button>
           </div>
-
+          */}
+          
             {/* Registration Info */}
             <p className="text-center text-gray-600 mt-8 text-sm">
               ¿No tienes una cuenta?{' '}
