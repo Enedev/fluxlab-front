@@ -8,12 +8,12 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import useRedirectIfAuthenticated from '../hooks/useRedirectIfAuthenticated';
+import { authService } from '../services/authService';
 import logo from '../assets/logoConFondo.jpeg';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, loading } = useAuth();
+  const { login, updateUserPasswordChanged } = useAuth();
   
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -26,12 +26,10 @@ export default function LoginPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-
-  // Redirect if already logged in
-  useRedirectIfAuthenticated();
+  const [currentUser, setCurrentUser] = useState(null);
 
   /**
-   * Handle form submission
+   * Handle form submission - SIMPLE FLOW
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,33 +37,51 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      // Validate inputs
       if (!email.trim()) {
-        setError('Por favor, introduzca su correo electrónico.');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (!password) {
-        setError('Por favor, introduzca su contraseña.');
+        setError('Por favor, introduzca su correo electronico.');
         setIsSubmitting(false);
         return;
       }
 
-      // Attempt login with Supabase
-      const result = await login(email, password);
-      
-      if (result.success) {
-        // Check if user needs to change password
-        if (result.user && result.user.passwordChanged === false) {
-          setShowPasswordChangeModal(true);
-        } else {
-          // Redirect to dashboard on successful login
-          navigate('/dashboard');
-        }
-      } else {
-        setError(result.error || 'Login failed. Please try again.');
+      if (!password) {
+        setError('Por favor, introduzca su contrasena.');
+        setIsSubmitting(false);
+        return;
       }
+
+      // Use authService.signIn directly so we DON'T set global context yet
+      const result = await authService.signIn(email, password);
+
+      if (result.error) {
+        setError(result.error || 'Error al iniciar sesión');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const user = result.user;
+      console.log('SignIn result user:', user);
+      setCurrentUser(user);
+
+      // If user is admin, bypass forced password change
+      const isAdmin = user?.app_metadata?.role === 'admin' || user?.role === 'admin';
+
+      if (!isAdmin && user?.passwordChanged === false) {
+        // show modal and DO NOT set global auth yet
+        console.log('passwordChanged false and not admin -> show modal');
+        setShowPasswordChangeModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Otherwise finalize login in context
+      const loginResult = await login(email, password);
+      if (!loginResult.success) {
+        setError(loginResult.error || 'Error al establecer la sesión');
+        setIsSubmitting(false);
+        return;
+      }
+
+      navigate('/dashboard');
     } catch (err) {
       setError(err.message || 'An unexpected error occurred');
     } finally {
@@ -102,15 +118,45 @@ export default function LoginPage() {
       }
 
       // Change password via authService
-      const { authService } = await import('../services/authService');
-      const result = await authService.changePassword(newPassword);
+      console.log('Attempting to change password...');
+      const changeResult = await authService.changePassword(newPassword);
 
-      if (result.error) {
-        setPasswordError(result.error || 'Error al cambiar la contraseña.');
+      if (changeResult.error) {
+        console.error('Password change error:', changeResult.error);
+        setPasswordError(changeResult.error || 'Error al cambiar la contraseña.');
+        setIsChangingPassword(false);
       } else {
-        // Password changed successfully
+        console.log('Password changed successfully!');
+        // Password changed successfully - now finalize login in context with the new password
+        const updatedUser = {
+          ...currentUser,
+          passwordChanged: true,
+        };
+        setCurrentUser(updatedUser);
+
+        // Re-authenticate to set global session with the new password
+        const loginResult = await login(currentUser?.email || email, newPassword);
+        if (!loginResult.success) {
+          setPasswordError(loginResult.error || 'Error al iniciar sesión después de cambiar la contraseña.');
+          setIsChangingPassword(false);
+          return;
+        }
+
+        // update context user state if needed
+        updateUserPasswordChanged(loginResult.user || updatedUser);
+
+        // Close modal and redirect to dashboard
+        console.log('Closing modal and navigating to dashboard');
         setShowPasswordChangeModal(false);
-        navigate('/dashboard');
+        setIsChangingPassword(false);
+
+        // Clear form
+        setNewPassword('');
+        setConfirmPassword('');
+        setPasswordError('');
+
+        // Navigate
+        setTimeout(() => navigate('/dashboard'), 100);
       }
     } catch (err) {
       setPasswordError(err.message || 'Error al cambiar la contraseña');
@@ -207,10 +253,10 @@ export default function LoginPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSubmitting || loading}
+                disabled={isSubmitting}
                 className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white font-bold py-3 px-4 rounded transition mt-6 tracking-wide disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isSubmitting || loading ? (
+                {isSubmitting ? (
                   <>
                     <span className="inline-block animate-spin">⏳</span>
                     INICIANDO SESIÓN...
@@ -241,7 +287,7 @@ export default function LoginPage() {
       </div>
 
       {/* Password Change Modal */}
-      {showPasswordChangeModal && (
+      {showPasswordChangeModal && currentUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Cambiar Contraseña</h2>

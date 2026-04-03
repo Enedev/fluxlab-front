@@ -7,15 +7,22 @@
  */
 
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    // Navigation handled by ProtectedRoute after logout
+    try {
+      await logout();
+      // Navigate to login after logout
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
   // Get user initials for avatar placeholder

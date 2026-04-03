@@ -30,7 +30,27 @@ export function AuthProvider({ children }) {
         const currentSession = await authService.getCurrentSession();
         if (currentSession) {
           setSession(currentSession);
-          setUser(currentSession.user);
+
+          // Try to fetch backend user data to enrich session.user (passwordChanged, role, etc.)
+          try {
+            const response = await fetch('http://localhost:3000/api/users/me', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${currentSession.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (response.ok) {
+              const userData = await response.json();
+              setUser({ ...currentSession.user, ...userData });
+            } else {
+              setUser(currentSession.user);
+            }
+          } catch (err) {
+            console.error('Error fetching backend user in initializeAuth:', err);
+            setUser(currentSession.user);
+          }
         }
       } catch (err) {
         console.error('Initialize auth error:', err);
@@ -45,9 +65,34 @@ export function AuthProvider({ children }) {
     // Listen for auth state changes
     if (supabase) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (_event, session) => {
+        async (_event, session) => {
           setSession(session);
-          setUser(session?.user || null);
+
+          if (!session?.user) {
+            setUser(null);
+            return;
+          }
+
+          // Fetch backend user info and merge (so we have passwordChanged and DB role)
+          try {
+            const response = await fetch('http://localhost:3000/api/users/me', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (response.ok) {
+              const userData = await response.json();
+              setUser({ ...session.user, ...userData });
+            } else {
+              setUser(session.user);
+            }
+          } catch (err) {
+            console.error('Error fetching backend user on auth change:', err);
+            setUser(session.user);
+          }
         }
       );
 
@@ -94,9 +139,17 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setError(null);
     try {
-      await authService.signOut();
+      // Clear context state immediately
       setSession(null);
       setUser(null);
+      
+      // Then call Supabase logout
+      const result = await authService.signOut();
+      
+      if (result.error) {
+        console.error('Logout error:', result.error);
+      }
+      
       return { success: true };
     } catch (err) {
       const message = err.message || 'Logout failed';
@@ -129,6 +182,13 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Update user after password change
+   */
+  const updateUserPasswordChanged = (updatedUser) => {
+    setUser(updatedUser);
   };
 
   /**
@@ -185,6 +245,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     signup,
+    updateUserPasswordChanged,
     
     // Utilities
     isAuthenticated,

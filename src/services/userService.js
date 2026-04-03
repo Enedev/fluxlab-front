@@ -197,3 +197,34 @@ export async function getUser(userId) {
     throw error;
   }
 }
+
+/**
+ * Update a user (name/email/active)
+ */
+export async function updateUser(userId, userData) {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_URL}/users/${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(userData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error updating user');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw error;
+  }
+}

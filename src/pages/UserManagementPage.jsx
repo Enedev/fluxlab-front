@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
-import { createUser, getAllUsers, deleteUser } from '../services/userService';
+import { createUser, getAllUsers, deleteUser, updateUser } from '../services/userService';
 
 const ROLES = [
   { id: 'technician', label: 'Técnico de laboratorio' },
@@ -23,6 +23,12 @@ export default function UserManagementPage() {
   const [newUserPassword, setNewUserPassword] = useState(null);
   const [newUserEmail, setNewUserEmail] = useState(null);
   const [filterRole, setFilterRole] = useState('all'); // 'all', 'technician', 'researcher'
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -103,6 +109,51 @@ export default function UserManagementPage() {
       await loadUsers();
     } catch (err) {
       setError(`Error al eliminar usuario: ${err.message}`);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Open edit modal
+  function handleOpenEditModal(user) {
+    setEditingUser(user);
+    setEditFormData({
+      name: user.name || '',
+      email: user.email || '',
+    });
+    setShowEditModal(true);
+  }
+
+  // Handle edit form input change
+  function handleEditInputChange(e) {
+    const { name, value } = e.target;
+    setEditFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
+
+  // Save edited user
+  async function handleEditUserSubmit(e) {
+    e.preventDefault();
+
+    if (!editingUser?.id) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      await updateUser(editingUser.id, {
+        name: editFormData.name,
+        email: editFormData.email,
+      });
+
+      setShowEditModal(false);
+      setEditingUser(null);
+      await loadUsers();
+    } catch (err) {
+      setError(`Error al actualizar usuario: ${err.message}`);
       console.error(err);
     } finally {
       setLoading(false);
@@ -331,21 +382,30 @@ export default function UserManagementPage() {
                               </td>
                               <td className="px-6 py-4 text-sm">
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                  user.active
+                                  user.passwordChanged
                                     ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
+                                    : 'bg-yellow-100 text-yellow-800'
                                 }`}>
-                                  {user.active ? '● ACTIVO' : '● INACTIVO'}
+                                  {user.passwordChanged ? '● ACTIVO' : '● PENDIENTE'}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-sm">
-                                <button
-                                  onClick={() => handleDeleteUser(user.id)}
-                                  disabled={loading}
-                                  className="text-red-600 hover:text-red-800 font-medium disabled:text-gray-400"
-                                >
-                                  Eliminar
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => handleOpenEditModal(user)}
+                                    disabled={loading}
+                                    className="text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-400"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    disabled={loading}
+                                    className="text-red-600 hover:text-red-800 font-medium disabled:text-gray-400"
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -440,6 +500,62 @@ export default function UserManagementPage() {
             >
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-xl w-full mx-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Editar Usuario</h2>
+            <p className="text-sm text-gray-600 mb-6">Actualiza nombre y correo del usuario.</p>
+
+            <form onSubmit={handleEditUserSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nombre Completo</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={editFormData.name}
+                  onChange={handleEditInputChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={editFormData.email}
+                  onChange={handleEditInputChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingUser(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:bg-gray-400"
+                >
+                  {loading ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

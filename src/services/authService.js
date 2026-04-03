@@ -27,9 +27,12 @@ export const authService = {
 
       // Get passwordChanged status from backend
       let passwordChanged = false;
-      try {
-        const token = data.session?.access_token;
-        if (token) {
+      let backendData = {};
+      const token = data.session?.access_token;
+      
+      if (token) {
+        try {
+          console.log('Fetching user data from backend...');
           const response = await fetch('http://localhost:3000/api/users/me', {
             method: 'GET',
             headers: {
@@ -37,23 +40,33 @@ export const authService = {
               'Content-Type': 'application/json',
             },
           });
-          
+
+          console.log('Backend response status:', response.status);
+
           if (response.ok) {
-            const userData = await response.json();
-            passwordChanged = userData.passwordChanged || false;
+            backendData = await response.json();
+            console.log('Backend user data:', backendData);
+            passwordChanged = backendData.passwordChanged === true;
+          } else {
+            console.error('Backend error:', response.statusText);
           }
+        } catch (err) {
+          console.error('Error fetching user data from backend:', err);
         }
-      } catch (err) {
-        console.error('Error fetching user data from backend:', err);
       }
 
+      console.log('Final passwordChanged value:', passwordChanged);
+
+      const mergedUser = {
+        ...data.user,
+        ...backendData,
+        passwordChanged,
+      };
+
       return {
-        user: {
-          ...data.user,
-          passwordChanged
-        },
+        user: mergedUser,
         session: data.session,
-        error: null
+        error: null,
       };
     } catch (error) {
       console.error('Supabase sign in error:', error);
@@ -147,16 +160,45 @@ export const authService = {
   },
 
   /**
-   * Listen to authentication state changes
+   * Change user password
+   * Updates password in Supabase and marks passwordChanged as true in backend
    */
-  onAuthStateChange(callback) {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        callback(session?.user || null, session);
+  async changePassword(newPassword) {
+    try {
+      const token = await this.getAccessToken();
+      if (!token) {
+        throw new Error('No authentication token found');
       }
-    );
-    return subscription;
-  }
+
+      const response = await fetch('http://localhost:3000/api/users/change-password', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: newPassword }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to change password');
+      }
+
+      const result = await response.json();
+      console.log('Password changed successfully:', result);
+      
+      return { 
+        error: null,
+        data: result,
+      };
+    } catch (error) {
+      console.error('Error changing password:', error);
+      return { 
+        error: error.message || 'Failed to change password',
+        data: null,
+      };
+    }
+  },
 };
 
 export default authService;
