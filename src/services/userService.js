@@ -1,0 +1,199 @@
+/**
+ * User Management Service
+ * Handles communication with backend user endpoints
+ */
+
+// Backend API URL - Update this when backend is ready
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+/**
+ * Generate a temporary default password
+ */
+function generateDefaultPassword() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+  let password = '';
+  for (let i = 0; i < 12; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+/**
+ * Get authentication token from Supabase session
+ */
+async function getAuthToken() {
+  try {
+    const { supabase } = await import('../config/supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+}
+
+/**
+ * Create a new user (Admin only)
+ */
+export async function createUser(userData) {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    // Generate default password
+    const defaultPassword = generateDefaultPassword();
+
+    const payload = {
+      name: userData.name,
+      email: userData.email,
+      password: defaultPassword,
+      role: userData.role,
+      active: true,
+    };
+
+    const response = await fetch(`${API_URL}/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error creating user');
+    }
+
+    const newUser = await response.json();
+
+    // Return user data with the generated default password
+    return {
+      ...newUser,
+      temporaryPassword: defaultPassword, // Include the password we generated locally
+    };
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all users (Admin only)
+ */
+export async function getAllUsers() {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_URL}/users`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error fetching users');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a user (Admin only)
+ */
+export async function deleteUser(userId) {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_URL}/users/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error deleting user');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update user password
+ */
+export async function updateUserPassword(userId, newPassword) {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_URL}/users/${userId}/password`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ password: newPassword }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error updating password');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating password:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get single user
+ */
+export async function getUser(userId) {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_URL}/users/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error fetching user');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    throw error;
+  }
+}

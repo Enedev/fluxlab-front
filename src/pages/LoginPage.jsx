@@ -20,6 +20,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Redirect if already logged in
   useRedirectIfAuthenticated();
@@ -50,8 +56,13 @@ export default function LoginPage() {
       const result = await login(email, password);
       
       if (result.success) {
-        // Redirect to dashboard on successful login
-        navigate('/dashboard');
+        // Check if user needs to change password
+        if (result.user && result.user.passwordChanged === false) {
+          setShowPasswordChangeModal(true);
+        } else {
+          // Redirect to dashboard on successful login
+          navigate('/dashboard');
+        }
       } else {
         setError(result.error || 'Login failed. Please try again.');
       }
@@ -59,6 +70,52 @@ export default function LoginPage() {
       setError(err.message || 'An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Handle password change
+   */
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setIsChangingPassword(true);
+
+    try {
+      // Validate inputs
+      if (!newPassword || !confirmPassword) {
+        setPasswordError('Por favor, complete todos los campos.');
+        setIsChangingPassword(false);
+        return;
+      }
+
+      if (newPassword.length < 8) {
+        setPasswordError('La contraseña debe tener al menos 8 caracteres.');
+        setIsChangingPassword(false);
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setPasswordError('Las contraseñas no coinciden.');
+        setIsChangingPassword(false);
+        return;
+      }
+
+      // Change password via authService
+      const { authService } = await import('../services/authService');
+      const result = await authService.changePassword(newPassword);
+
+      if (result.error) {
+        setPasswordError(result.error || 'Error al cambiar la contraseña.');
+      } else {
+        // Password changed successfully
+        setShowPasswordChangeModal(false);
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setPasswordError(err.message || 'Error al cambiar la contraseña');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -163,38 +220,6 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-            
-            {/*
-            // Comentados por ahora, pero listos para ser implementados con Supabase Social Auth
-            // Divider 
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">O ACCEDE CON TU CUENTA</span>
-              </div>
-            </div>
-
-            // Botones de Google y Microsoft
-            <div className="flex gap-4 justify-center">
-            <button className="flex items-center justify-center rounded-xl bg-[#1A1A1A] hover:bg-black transition-all shadow-lg w-14 h-14 group">
-              <img
-                src="https://www.svgrepo.com/show/448239/microsoft.svg"
-                alt="Microsoft"
-                className="w-8 h-8 group-hover:scale-110 transition-transform"
-              />
-            </button>
-
-            <button className="flex items-center justify-center rounded-xl bg-[#1A1A1A] hover:bg-black transition-all shadow-lg w-14 h-14 group">
-              <img
-                src="https://www.svgrepo.com/show/303108/google-icon-logo.svg"
-                alt="Google"
-                className="w-7 h-7 group-hover:scale-110 transition-transform"
-              />
-            </button>
-          </div>
-          */}
           
             {/* Registration Info */}
             <p className="text-center text-gray-600 mt-8 text-sm">
@@ -214,6 +239,95 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordChangeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Cambiar Contraseña</h2>
+            <p className="text-gray-600 text-sm mb-6">
+              Por tu seguridad, debes cambiar tu contraseña temporal antes de continuar.
+            </p>
+            
+            {/* Error Message */}
+            {passwordError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{passwordError}</p>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              {/* New Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nueva Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="••••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={isChangingPassword}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    disabled={isChangingPassword}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                  >
+                    {showNewPassword ? '🙈' : '👁️'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmar Contraseña
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={isChangingPassword}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-xs text-blue-800">
+                  <strong>💡 Consejo:</strong> Usa una contraseña fuerte con letras mayúsculas, minúsculas, números y caracteres especiales.
+                </p>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isChangingPassword}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              >
+                {isChangingPassword ? (
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    Cambiando...
+                  </>
+                ) : (
+                  <>
+                    <span>🔒</span>
+                    Cambiar Contraseña
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="bg-white border-t py-6 px-4 text-center text-xs text-gray-500">

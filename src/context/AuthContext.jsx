@@ -73,7 +73,11 @@ export function AuthProvider({ children }) {
 
       setSession(result.session);
       setUser(result.user);
-      return { success: true };
+      return { 
+        success: true, 
+        user: result.user,
+        session: result.session 
+      };
     } catch (err) {
       const message = err.message || 'Login failed';
       setError(message);

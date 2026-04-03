@@ -25,8 +25,33 @@ export const authService = {
 
       if (error) throw error;
 
+      // Get passwordChanged status from backend
+      let passwordChanged = false;
+      try {
+        const token = data.session?.access_token;
+        if (token) {
+          const response = await fetch('http://localhost:3000/api/users/me', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (response.ok) {
+            const userData = await response.json();
+            passwordChanged = userData.passwordChanged || false;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user data from backend:', err);
+      }
+
       return {
-        user: data.user,
+        user: {
+          ...data.user,
+          passwordChanged
+        },
         session: data.session,
         error: null
       };
