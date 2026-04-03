@@ -9,11 +9,24 @@
 import { authService } from './authService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const CLIENTS_API_URL = import.meta.env.VITE_CLIENTS_API_URL || 'http://localhost:3000/api/clients';
+
+function buildApiUrl(baseUrl, endpoint = '') {
+  if (!endpoint) return baseUrl;
+
+  if (endpoint.startsWith('?')) {
+    return `${baseUrl}${endpoint}`;
+  }
+
+  const normalizedBase = baseUrl.replace(/\/$/, '');
+  const normalizedEndpoint = endpoint.replace(/^\//, '');
+  return `${normalizedBase}/${normalizedEndpoint}`;
+}
 
 /**
  * Make authenticated API requests with JWT token
  */
-async function apiRequest(endpoint, options = {}) {
+async function apiRequest(endpoint, options = {}, baseUrl = API_URL) {
   try {
     // Get JWT token from Supabase
     const token = await authService.getAccessToken();
@@ -28,7 +41,7 @@ async function apiRequest(endpoint, options = {}) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(buildApiUrl(baseUrl, endpoint), {
       ...options,
       headers
     });
@@ -90,19 +103,43 @@ export const apiService = {
    * POST /api/clients
    */
   clients: {
-    async getAll() {
-      return apiRequest('/clients');
+    async getAll(params = {}) {
+      const searchParams = new URLSearchParams();
+
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          searchParams.append(key, String(value));
+        }
+      });
+
+      const query = searchParams.toString();
+      const endpoint = query ? `?${query}` : '';
+
+      return apiRequest(endpoint, {}, CLIENTS_API_URL);
     },
 
     async getById(id) {
-      return apiRequest(`/clients/${id}`);
+      return apiRequest(`/${id}`, {}, CLIENTS_API_URL);
     },
 
     async create(clientData) {
-      return apiRequest('/clients', {
+      return apiRequest('', {
         method: 'POST',
         body: JSON.stringify(clientData)
-      });
+      }, CLIENTS_API_URL);
+    },
+
+    async update(id, clientData) {
+      return apiRequest(`/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(clientData)
+      }, CLIENTS_API_URL);
+    },
+
+    async remove(id) {
+      return apiRequest(`/${id}`, {
+        method: 'DELETE'
+      }, CLIENTS_API_URL);
     }
   },
 
