@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import Button from '../components/Button';
 import logo from '../assets/logoConFondo.jpeg';
 
 export default function LoginPage() {
@@ -254,11 +255,11 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white font-bold py-3 px-4 rounded transition mt-6 tracking-wide disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full mt-6"
               >
                 {isSubmitting ? (
                   <>
-                    <span className="inline-block animate-spin">⏳</span>
+                    <span className="inline-block animate-spin mr-2">⏳</span>
                     INICIANDO SESIÓN...
                   </>
                 ) : (
@@ -301,6 +302,30 @@ export default function LoginPage() {
                 <p className="text-sm text-red-700">{passwordError}</p>
               </div>
             )}
+
+            {/* Email Display with Copy Button */}
+            <div className="mb-6 pb-6 border-b border-gray-200">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tu Correo Electrónico
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={currentUser?.email || email}
+                  className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-700 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentUser?.email || email);
+                  }}
+                  className=""
+                >
+                  📋 Copiar
+                </button>
+              </div>
+            </div>
 
             {/* Form */}
             <form onSubmit={handlePasswordChange} className="space-y-4">
@@ -356,18 +381,14 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isChangingPassword}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 disabled:cursor-not-allowed"
               >
                 {isChangingPassword ? (
                   <>
-                    <span className="inline-block animate-spin">⏳</span>
+                    <span className="inline-block animate-spin mr-2">⏳</span>
                     Cambiando...
                   </>
                 ) : (
-                  <>
-                    <span>🔒</span>
-                    Cambiar Contraseña
-                  </>
+                  <>🔒 Cambiar Contraseña</>
                 )}
               </button>
             </form>

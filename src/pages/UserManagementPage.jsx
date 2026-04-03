@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
+import Button from '../components/Button';
 import { createUser, getAllUsers, deleteUser, updateUser } from '../services/userService';
 
 const ROLES = [
@@ -286,10 +287,9 @@ export default function UserManagementPage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition flex items-center justify-center gap-2"
+                      className="w-full"
                     >
-                      <span>🔒</span>
-                      {loading ? 'Creando...' : 'Completar Registro'}
+                      {loading ? '⏳ Creando...' : '🔒 Completar Registro'}
                     </button>
                   </form>
 
@@ -390,20 +390,20 @@ export default function UserManagementPage() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-sm">
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-col items-start gap-2">
                                   <button
                                     onClick={() => handleOpenEditModal(user)}
                                     disabled={loading}
-                                    className="text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-400"
+                                    className="text-xs px-2 py-1 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded disabled:bg-gray-200 disabled:text-gray-400 transition"
                                   >
-                                    Editar
+                                    ✏️ Editar
                                   </button>
                                   <button
                                     onClick={() => handleDeleteUser(user.id)}
                                     disabled={loading}
-                                    className="text-red-600 hover:text-red-800 font-medium disabled:text-gray-400"
+                                    className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded disabled:bg-gray-200 disabled:text-gray-400 transition"
                                   >
-                                    Eliminar
+                                    🗑️ Eliminar
                                   </button>
                                 </div>
                               </td>
@@ -459,9 +459,9 @@ export default function UserManagementPage() {
                   />
                   <button
                     onClick={() => copyToClipboard(newUserEmail)}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg"
+                    className=""
                   >
-                    Copiar
+                    📋 Copiar
                   </button>
                 </div>
               </div>
@@ -478,9 +478,9 @@ export default function UserManagementPage() {
                   />
                   <button
                     onClick={() => copyToClipboard(newUserPassword)}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg"
+                    className=""
                   >
-                    Copiar
+                    📋 Copiar
                   </button>
                 </div>
               </div>
@@ -496,9 +496,9 @@ export default function UserManagementPage() {
             {/* Close button */}
             <button
               onClick={() => setShowPasswordModal(false)}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+              className="w-full"
             >
-              Entendido
+              ✅ Entendido
             </button>
           </div>
         </div>
@@ -545,14 +545,13 @@ export default function UserManagementPage() {
                   }}
                   className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
-                  Cancelar
+                  ✕ Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:bg-gray-400"
                 >
-                  {loading ? 'Guardando...' : 'Guardar Cambios'}
+                  {loading ? '⏳ Guardando...' : '💾 Guardar Cambios'}
                 </button>
               </div>
             </form>
