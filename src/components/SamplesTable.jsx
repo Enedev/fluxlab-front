@@ -2,7 +2,7 @@
  * Samples Table Component
  * 
  * Displays a list of lab samples with their associated templates and status
- * Integrates with Inline Editing and Quick Add
+ * Integrates with Inline Editing, Quick Add, and a traditional Creation Modal
  */
 
 import { useState, useEffect } from 'react';
@@ -24,6 +24,8 @@ export default function SamplesTable() {
     fieldValues: {}
   });
 
+  // Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [sampleToDelete, setSampleToDelete] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
@@ -31,13 +33,21 @@ export default function SamplesTable() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
 
-  // Quick Add State
+  // Quick Add State (for the "+" in templates)
   const [quickAddRow, setQuickAddRow] = useState({
     templateId: null,
     projectId: null,
     code: '',
     status: 'pending',
     fieldValues: {}
+  });
+
+  // Dedicated Create Form State (for the Modal)
+  const [createFormData, setCreateFormData] = useState({
+    code: '',
+    projectId: '',
+    templateId: '',
+    status: 'pending'
   });
 
   // Load samples and templates on component mount
@@ -81,24 +91,22 @@ export default function SamplesTable() {
     }
   };
 
-  const handleCreateNew = () => {
-    setIsEditing(false);
-    setFormData({ code: '', status: 'pending', templateId: '', projectId: '', fieldValues: {} });
-    setSelectedSample(null);
-    setShowModal(true);
-  };
-
-  const handleEdit = (sample) => {
-    setIsEditing(true);
-    setSelectedSample(sample);
-    
-    // Mapear valores existentes del backend si hay
+  const startEditing = (sample) => {
+    setEditingId(sample.id);
     const initialFieldValues = {};
-    if (sample.values) {
-      sample.values.forEach(v => {
-        initialFieldValues[v.fieldId] = v.valueText || v.valueNumber || v.valueDate || v.valueBoolean || '';
-      });
-    }
+    const valuesSource = sample.sampleFieldValues || sample.values || [];
+    
+    valuesSource.forEach(v => {
+      const fieldId = v.field?.id || v.fieldId;
+      if (fieldId) {
+        let val = '';
+        if (v.valueText !== null && v.valueText !== undefined) val = v.valueText;
+        else if (v.valueNumber !== null && v.valueNumber !== undefined) val = v.valueNumber;
+        else if (v.valueDate !== null && v.valueDate !== undefined) val = v.valueDate;
+        else if (v.valueBoolean !== null && v.valueBoolean !== undefined) val = v.valueBoolean;
+        initialFieldValues[fieldId] = val;
+      }
+    });
 
     setEditFormData({
       status: sample.status,
@@ -114,17 +122,17 @@ export default function SamplesTable() {
   const saveInlineEdit = async (sample) => {
     setIsSubmitting(true);
     try {
-      const template = templates.find(t => t.id === sample.template?.id);
+      const template = templates.find(t => t.id === (sample.template?.id || sample.templateId));
       const payload = {
         status: editFormData.status,
         values: Object.entries(editFormData.fieldValues).map(([fieldId, value]) => {
           const field = template?.fields?.find(f => f.id === fieldId);
           return {
             fieldId,
-            valueText: field?.dataType === 'text' ? String(value) : null,
-            valueNumber: field?.dataType === 'number' ? Number(value) : null,
-            valueDate: field?.dataType === 'date' ? value : null,
-            valueBoolean: field?.dataType === 'boolean' ? Boolean(value) : null
+            valueText: field?.dataType === 'text' ? (value !== null ? String(value) : "") : null,
+            valueNumber: field?.dataType === 'number' ? (value !== null && value !== "" ? Number(value) : 0) : null,
+            valueDate: field?.dataType === 'date' ? (value || new Date().toISOString()) : null,
+            valueBoolean: field?.dataType === 'boolean' ? (value === true || value === "true") : null
           };
         })
       };
@@ -133,7 +141,42 @@ export default function SamplesTable() {
       await loadData();
       cancelEditing();
     } catch (err) {
+      console.error('Error saving edit:', err);
       setError(err.message || 'Error al actualizar la muestra');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handeModalCreate = async (e) => {
+    e.preventDefault();
+    if (!createFormData.code || !createFormData.projectId || !createFormData.templateId) {
+      setError('Por favor completa los campos obligatorios');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const template = templates.find(t => t.id === createFormData.templateId);
+      
+      const initialValues = (template?.fields || []).map(field => {
+        const base = { fieldId: field.id };
+        if (field.dataType === 'boolean') return { ...base, valueBoolean: false };
+        if (field.dataType === 'number') return { ...base, valueNumber: 0 };
+        if (field.dataType === 'date') return { ...base, valueDate: new Date().toISOString() };
+        return { ...base, valueText: "" };
+      });
+
+      await apiService.samples.createWithValues({
+        ...createFormData,
+        values: initialValues
+      });
+      
+      await loadData();
+      setShowCreateModal(false);
+      setCreateFormData({ code: '', projectId: '', templateId: '', status: 'pending' });
+    } catch (err) {
+      setError(err.message || 'Error al crear la muestra');
     } finally {
       setIsSubmitting(false);
     }
@@ -155,29 +198,38 @@ export default function SamplesTable() {
         projectId,
         values: Object.entries(quickAddRow.fieldValues).map(([fieldId, value]) => {
           const field = template?.fields?.find(f => f.id === fieldId);
-          return {
-            fieldId,
-            valueText: field?.dataType === 'text' ? String(value) : null,
-            valueNumber: field?.dataType === 'number' ? Number(value) : null,
-            valueDate: field?.dataType === 'date' ? value : null,
-            valueBoolean: field?.dataType === 'boolean' ? Boolean(value) : null
-          };
+          const base = { fieldId };
+          if (field?.dataType === 'text') return { ...base, valueText: String(value || "") };
+          if (field?.dataType === 'number') return { ...base, valueNumber: (value !== "" ? Number(value) : 0) };
+          if (field?.dataType === 'date') return { ...base, valueDate: (value || new Date().toISOString()) };
+          if (field?.dataType === 'boolean') return { ...base, valueBoolean: (value === true || value === "true") };
+          return { ...base, valueText: "" };
         })
       };
 
-      if (isEditing && selectedSample) {
-        const updatedSample = await apiService.samples.updateWithValues(selectedSample.id, samplePayload);
-        setSamples(samples.map(s => 
-          s.id === selectedSample.id ? updatedSample : s
-        ));
-      } else {
-        const newSample = await apiService.samples.createWithValues(samplePayload);
-        setSamples([...samples, newSample]);
-      }
-      setShowModal(false);
-      setFormData({ code: '', status: 'pending', templateId: '', projectId: '', fieldValues: {} });
-      setSelectedSample(null);
-      setIsEditing(false);
+      await apiService.samples.createWithValues(payload);
+      await loadData();
+      setQuickAddRow({ templateId: null, projectId: null, code: '', status: 'pending', fieldValues: {} });
+    } catch (err) {
+      setError(err.message || 'Error en creaci�n r�pida');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = (id) => {
+    setSampleToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!sampleToDelete) return;
+    try {
+      setIsSubmitting(true);
+      await apiService.samples.remove(sampleToDelete);
+      setSamples(samples.filter(s => s.id !== sampleToDelete));
+      setShowDeleteModal(false);
+      setSampleToDelete(null);
     } catch (err) {
       console.error('Error deleting sample:', err);
       setError('Error al eliminar la muestra');
@@ -246,18 +298,30 @@ export default function SamplesTable() {
 
       {/* Header Controls */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-900 border-l-4 border-teal-500 pl-3">Sustancias y Muestras</h2>
-        <div className="w-full md:w-48">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 border-l-4 border-teal-500 pl-3">Muestras</h2>
+          <p className="text-xs text-gray-500 pl-3 mt-1 font-bold">{samples.length} muestras en total</p>
+        </div>
+        
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="w-full md:w-48">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="all">Todos los estados</option>
+              <option value="pending">Pendiente</option>
+              <option value="completed">Completado</option>
+              <option value="rejected">Rechazado</option>
+            </select>
+          </div>
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="whitespace-nowrap bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium text-sm flex items-center gap-2 shadow-sm"
           >
-            <option value="all">Todos los estados</option>
-            <option value="pending">Pendiente</option>
-            <option value="completed">Completado</option>
-            <option value="rejected">Rechazado</option>
-          </select>
+            <span>+</span> Crear Muestra
+          </button>
         </div>
       </div>
 
@@ -382,15 +446,27 @@ export default function SamplesTable() {
                                   if (isEditingCurrent) {
                                     return (
                                       <td key={field.id} className="px-6 py-4">
-                                        <input
-                                          type={field.dataType === "number" ? "number" : "text"}
-                                          className="w-full text-xs font-bold text-slate-900 border border-teal-200 rounded px-2 py-1 bg-white"
-                                          value={editFormData.fieldValues[field.id] || ""}
-                                          onChange={(e) => setEditFormData({
-                                            ...editFormData,
-                                            fieldValues: { ...editFormData.fieldValues, [field.id]: e.target.value }
-                                          })}
-                                        />
+                                        {field.dataType === 'boolean' ? (
+                                          <input
+                                            type="checkbox"
+                                            className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                                            checked={!!editFormData.fieldValues[field.id]}
+                                            onChange={(e) => setEditFormData({
+                                              ...editFormData,
+                                              fieldValues: { ...editFormData.fieldValues, [field.id]: e.target.checked }
+                                            })}
+                                          />
+                                        ) : (
+                                          <input
+                                            type={field.dataType === "number" ? "number" : "text"}
+                                            className="w-full text-xs font-bold text-slate-900 border border-teal-200 rounded px-2 py-1 bg-white"
+                                            value={editFormData.fieldValues[field.id] || ""}
+                                            onChange={(e) => setEditFormData({
+                                              ...editFormData,
+                                              fieldValues: { ...editFormData.fieldValues, [field.id]: e.target.value }
+                                            })}
+                                          />
+                                        )}
                                       </td>
                                     );
                                   }
@@ -400,7 +476,15 @@ export default function SamplesTable() {
                                     if (valObj.valueText !== null && valObj.valueText !== undefined && valObj.valueText !== "") displayVal = valObj.valueText;
                                     else if (valObj.valueNumber !== null && valObj.valueNumber !== undefined) displayVal = valObj.valueNumber;
                                     else if (valObj.valueDate !== null && valObj.valueDate !== undefined) displayVal = valObj.valueDate;
-                                    else if (valObj.valueBoolean !== null && valObj.valueBoolean !== undefined) displayVal = valObj.valueBoolean ? "YES" : "NO";
+                                    else if (valObj.valueBoolean !== null && valObj.valueBoolean !== undefined) {
+                                      return (
+                                        <td key={field.id} className="px-6 py-4">
+                                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${valObj.valueBoolean ? "bg-teal-500 border-teal-500 text-white" : "bg-white border-gray-300"}`}>
+                                            {valObj.valueBoolean && "?"}
+                                          </div>
+                                        </td>
+                                      );
+                                    }
                                   }
                                   return (<td key={field.id} className="px-6 py-4 text-xs font-black text-slate-900">{displayVal}</td>);
                                 })}
@@ -412,13 +496,15 @@ export default function SamplesTable() {
                                         onClick={() => saveInlineEdit(sample)}
                                         className="text-green-600 hover:scale-125 transition text-lg"
                                         title="Guardar"
+                                        disabled={isSubmitting}
                                       >
-                                        ??
+                                        {isSubmitting ? "?" : "??"}
                                       </button>
                                       <button 
                                         onClick={cancelEditing}
                                         className="text-red-600 hover:scale-125 transition text-lg"
                                         title="Cancelar"
+                                        disabled={isSubmitting}
                                       >
                                         ?
                                       </button>
@@ -460,14 +546,23 @@ export default function SamplesTable() {
                             <td className="px-6 py-3 text-[10px] font-bold text-slate-300">AUTO-GEN</td>
                             {template.fields?.map(field => (
                               <td key={field.id} className="px-6 py-3">
-                                <input
-                                  type={field.dataType === "number" ? "number" : "text"}
-                                  placeholder="..."
-                                  className="bg-transparent border-none focus:ring-0 text-xs font-black text-slate-400 placeholder-slate-200 w-full"
-                                  value={quickAddRow.templateId === template.id && quickAddRow.projectId === project.id ? (quickAddRow.fieldValues[field.id] || "") : ""}
-                                  onChange={(e) => setQuickAddRow({ ...quickAddRow, templateId: template.id, projectId: project.id, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.value } })}
-                                  onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(template.id, project.id); }}
-                                />
+                                {field.dataType === 'boolean' ? (
+                                  <input
+                                    type="checkbox"
+                                    className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                                    checked={quickAddRow.templateId === template.id && quickAddRow.projectId === project.id ? !!quickAddRow.fieldValues[field.id] : false}
+                                    onChange={(e) => setQuickAddRow({ ...quickAddRow, templateId: template.id, projectId: project.id, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.checked } })}
+                                  />
+                                ) : (
+                                  <input
+                                    type={field.dataType === "number" ? "number" : "text"}
+                                    placeholder="..."
+                                    className="bg-transparent border-none focus:ring-0 text-xs font-black text-slate-400 placeholder-slate-200 w-full"
+                                    value={quickAddRow.templateId === template.id && quickAddRow.projectId === project.id ? (quickAddRow.fieldValues[field.id] || "") : ""}
+                                    onChange={(e) => setQuickAddRow({ ...quickAddRow, templateId: template.id, projectId: project.id, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.value } })}
+                                    onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(template.id, project.id); }}
+                                  />
+                                )}
                               </td>
                             ))}
                             <td className="px-6 py-3 text-right">
@@ -499,7 +594,11 @@ export default function SamplesTable() {
                               </td>
                               {template.fields?.map(field => (
                                 <td key={field.id} className="px-6 py-3">
-                                  <input type={field.dataType === "number" ? "number" : "text"} className="bg-transparent border-none focus:ring-0 text-xs font-black text-teal-900 w-full" value={quickAddRow.fieldValues[field.id] || ""} onChange={(e) => setQuickAddRow({ ...quickAddRow, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.value } })} onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(template.id, project.id); }} />
+                                  {field.dataType === 'boolean' ? (
+                                    <input type="checkbox" className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" checked={!!quickAddRow.fieldValues[field.id]} onChange={(e) => setQuickAddRow({ ...quickAddRow, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.checked } })} />
+                                  ) : (
+                                    <input type={field.dataType === "number" ? "number" : "text"} className="bg-transparent border-none focus:ring-0 text-xs font-black text-teal-900 w-full" value={quickAddRow.fieldValues[field.id] || ""} onChange={(e) => setQuickAddRow({ ...quickAddRow, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.value } })} onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(template.id, project.id); }} />
+                                  )}
                                 </td>
                               ))}
                               <td className="px-6 py-3 text-right">
@@ -514,6 +613,114 @@ export default function SamplesTable() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* CREATE MODAL (Restored) */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            {/* Modal Header */}
+            <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">??</span>
+                <h3 className="text-lg font-bold">Crear Muestra</h3>
+              </div>
+              <button 
+                onClick={() => setShowCreateModal(false)}
+                className="bg-white/20 hover:bg-white/30 p-1.5 rounded-lg transition"
+              >
+                <span className="block text-xl leading-none">&times;</span>
+              </button>
+            </div>
+
+            <form onSubmit={handeModalCreate} className="p-6 space-y-5">
+              {/* C�digo */}
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 font-bold">
+                  C�DIGO DE MUESTRA *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: BIO-MS-001"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 transition"
+                  value={createFormData.code}
+                  onChange={(e) => setCreateFormData({...createFormData, code: e.target.value})}
+                  required
+                />
+              </div>
+
+              {/* Proyecto */}
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 font-bold">
+                  PROYECTO *
+                </label>
+                <select
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 appearance-none transition"
+                  value={createFormData.projectId}
+                  onChange={(e) => setCreateFormData({...createFormData, projectId: e.target.value})}
+                  required
+                >
+                  <option value="">Selecciona un proyecto</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Template */}
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 font-bold">
+                  TEMPLATE *
+                </label>
+                <select
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 transition"
+                  value={createFormData.templateId}
+                  onChange={(e) => setCreateFormData({...createFormData, templateId: e.target.value})}
+                  required
+                >
+                  <option value="">Selecciona un template</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Estado */}
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 font-bold">
+                  ESTADO
+                </label>
+                <select
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 transition"
+                  value={createFormData.status}
+                  onChange={(e) => setCreateFormData({...createFormData, status: e.target.value})}
+                >
+                  <option value="pending">Pendiente</option>
+                  <option value="completed">Completado</option>
+                  <option value="rejected">Rechazado</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-200 transition disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Creando...' : 'Crear'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -536,3 +743,4 @@ export default function SamplesTable() {
     </div>
   );
 }
+

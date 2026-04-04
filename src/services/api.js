@@ -216,6 +216,13 @@ export const apiService = {
       });
     },
 
+    async updateWithValues(id, sampleData) {
+      return apiRequest(`/samples/${id}/with-values`, {
+        method: 'PATCH',
+        body: JSON.stringify(sampleData)
+      });
+    },
+
     async remove(id) {
       return apiRequest(`/samples/${id}`, {
         method: 'DELETE'
