@@ -443,7 +443,7 @@ export default function ClientsPage() {
           <div className="p-6 md:p-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900">Clientes institucionales</h1>
+                <h1 className="text-4xl font-bold text-gray-900">Clientes</h1>
                 <p className="text-gray-600 mt-1">
                   Gestiona laboratorios asociados y entidades registradas en la plataforma.
                 </p>
