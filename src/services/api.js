@@ -327,14 +327,20 @@ export const apiService = {
    * GET /api/samples
    * GET /api/samples/:id
    * POST /api/samples
+   * PATCH /api/samples/:id
+   * DELETE /api/samples/:id
    */
   samples: {
     async getRepository() {
       return apiRequest('/samples/repository');
     },
 
-    async getAll() {
-      return apiRequest('/samples');
+    async getAll(projectId = null) {
+      let endpoint = '/samples';
+      if (projectId) {
+        endpoint += `?projectId=${projectId}`;
+      }
+      return apiRequest(endpoint);
     },
 
     async getById(id) {
@@ -345,6 +351,72 @@ export const apiService = {
       return apiRequest('/samples', {
         method: 'POST',
         body: JSON.stringify(sampleData)
+      });
+    },
+
+    async createWithValues(sampleData) {
+      return apiRequest('/samples/with-values', {
+        method: 'POST',
+        body: JSON.stringify(sampleData)
+      });
+    },
+
+    async update(id, sampleData) {
+      return apiRequest(`/samples/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(sampleData)
+      });
+    },
+
+    async remove(id) {
+      return apiRequest(`/samples/${id}`, {
+        method: 'DELETE'
+      });
+    }
+  },
+
+  /**
+   * TEMPLATES ENDPOINTS
+   * GET /api/templates
+   * GET /api/templates/:id
+   * POST /api/templates
+   * POST /api/templates/with-fields
+   * PATCH /api/templates/:id
+   * DELETE /api/templates/:id
+   */
+  templates: {
+    async getAll() {
+      return apiRequest('/templates');
+    },
+
+    async getById(id) {
+      return apiRequest(`/templates/${id}`);
+    },
+
+    async create(templateData) {
+      return apiRequest('/templates', {
+        method: 'POST',
+        body: JSON.stringify(templateData)
+      });
+    },
+
+    async createWithFields(templateWithFieldsData) {
+      return apiRequest('/templates/with-fields', {
+        method: 'POST',
+        body: JSON.stringify(templateWithFieldsData)
+      });
+    },
+
+    async update(id, templateData) {
+      return apiRequest(`/templates/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(templateData)
+      });
+    },
+
+    async remove(id) {
+      return apiRequest(`/templates/${id}`, {
+        method: 'DELETE'
       });
     }
   }

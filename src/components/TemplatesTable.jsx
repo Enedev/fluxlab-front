@@ -1,0 +1,217 @@
+/**
+ * Templates Table Component
+ * 
+ * Displays a list of data templates with actions to create, edit, and delete
+ * Integrates with Supabase authentication and JWT tokens
+ */
+
+import { useState, useEffect } from 'react';
+import { apiService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import TemplateBuilder from './TemplateBuilder';
+
+export default function TemplatesTable() {
+  const { user } = useAuth();
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showBuilder, setShowBuilder] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState(null);
+
+  // Load templates on component mount
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.templates.getAll();
+      setTemplates(data);
+    } catch (err) {
+      console.error('Error loading templates:', err);
+      setError(err.message || 'Error al cargar los templates');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateNew = () => {
+    setSelectedTemplate(null);
+    setShowBuilder(true);
+  };
+
+  const handleEdit = (template) => {
+    setSelectedTemplate(template);
+    setShowBuilder(true);
+  };
+
+  const handleSaveSuccess = (updatedTemplate) => {
+    if (selectedTemplate) {
+      // Update existing: replace and keep order or move to top if preferred
+      // For now, let's keep it in its place but update the data
+      setTemplates(templates.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
+    } else {
+      // Add new: ALWAYS AT THE TOP
+      setTemplates([updatedTemplate, ...templates]);
+    }
+    setShowBuilder(false);
+    setSelectedTemplate(null);
+  };
+
+  const handleCancelBuilder = () => {
+    setShowBuilder(false);
+    setSelectedTemplate(null);
+  };
+
+  const handleDelete = (id) => {
+    setTemplateToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!templateToDelete) return;
+    
+    try {
+      await apiService.templates.remove(templateToDelete);
+      setTemplates(templates.filter(t => t.id !== templateToDelete));
+      setShowDeleteModal(false);
+      setTemplateToDelete(null);
+    } catch (err) {
+      console.error('Error deleting template:', err);
+      setError('Error al eliminar el template');
+      setShowDeleteModal(false);
+    }
+  };
+
+  if (showBuilder) {
+    return (
+      <TemplateBuilder 
+        template={selectedTemplate}
+        onSave={handleSaveSuccess} 
+        onCancel={handleCancelBuilder} 
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-500 italic">Cargando templates...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 font-medium">
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* Header with Create Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Plantillas de Datos</h2>
+          <p className="text-sm text-gray-500">Define la estructura para tus protocolos de laboratorio</p>
+        </div>
+        <button
+          onClick={handleCreateNew}
+          className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-green-100"
+        >
+          <span>+</span>
+          <span>Nueva Plantilla</span>
+        </button>
+      </div>
+
+      {/* Templates List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {templates.length === 0 ? (
+          <div className="col-span-full bg-white rounded-2xl border-2 border-dashed border-gray-100 p-12 text-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl text-gray-300">
+              📋
+            </div>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No hay plantillas creadas</p>
+          </div>
+        ) : (
+          templates.map((template) => (
+            <div 
+              key={template.id} 
+              className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group flex flex-col h-full relative"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-xl">
+                  📄
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    onClick={() => handleEdit(template)}
+                    className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg"
+                    title="Editar"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDelete(template.id)}
+                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                    title="Eliminar"
+                  >
+                    🗑
+                  </button>
+                </div>
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{template.name}</h3>
+              <p className="text-sm text-gray-500 line-clamp-2 mb-4 flex-1">
+                {template.description || 'Sin descripción disponible para esta plantilla.'}
+              </p>
+              
+              <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  {template.fields?.length || 0} Campos
+                </span>
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-lg uppercase tracking-widest">
+                  Ver Detalles
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
+              ⚠️
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar plantilla?</h3>
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              Esta acción no puede deshacerse. Asegúrate de que no haya muestras usando esta plantilla.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={confirmDelete}
+                className="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-bold transition-all"
+              >
+                Sí, eliminar definitivamente
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="w-full text-gray-500 px-4 py-3 font-bold hover:bg-gray-50 rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
