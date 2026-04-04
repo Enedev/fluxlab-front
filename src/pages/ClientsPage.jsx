@@ -10,13 +10,15 @@ import Sidebar from '../components/Sidebar';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const ITEMS_PER_PAGE = 10;
+// Paginacion de clientes (temporalmente deshabilitada)
+// const ITEMS_PER_PAGE = 10;
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'Estado: Todos' },
-  { value: 'active', label: 'Activo' },
-  { value: 'inactive', label: 'Inactivo' }
-];
+// Filtro por estado (temporalmente deshabilitado)
+// const STATUS_OPTIONS = [
+//   { value: 'all', label: 'Estado: Todos' },
+//   { value: 'active', label: 'Activo' },
+//   { value: 'inactive', label: 'Inactivo' }
+// ];
 
 const INITIAL_CLIENT_FORM = {
   name: '',
@@ -104,6 +106,59 @@ function normalizeClient(rawClient, index) {
   };
 }
 
+function normalizeClientName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function hasDuplicatedClientName(clientList, candidateName, excludedClientId = null) {
+  const normalizedCandidateName = normalizeClientName(candidateName);
+
+  if (!normalizedCandidateName) {
+    return false;
+  }
+
+  return clientList.some((client) => {
+    if (excludedClientId && client.id === excludedClientId) {
+      return false;
+    }
+
+    return normalizeClientName(client.name) === normalizedCandidateName;
+  });
+}
+
+function sanitizePhoneInput(value) {
+  const withoutInvalidCharacters = String(value || '').replace(/[^\d+\-()\s]/g, '');
+
+  if (withoutInvalidCharacters.startsWith('+')) {
+    return `+${withoutInvalidCharacters.slice(1).replace(/\+/g, '')}`;
+  }
+
+  return withoutInvalidCharacters.replace(/\+/g, '');
+}
+
+function isValidPhoneNumber(value) {
+  const trimmedValue = String(value || '').trim();
+
+  if (!trimmedValue) {
+    return true;
+  }
+
+  const normalizedValue = trimmedValue.replace(/[\s\-()]/g, '');
+
+  if (!/^\+?\d+$/.test(normalizedValue)) {
+    return false;
+  }
+
+  const digitsOnly = normalizedValue.startsWith('+')
+    ? normalizedValue.slice(1)
+    : normalizedValue;
+
+  return digitsOnly.length >= 7 && digitsOnly.length <= 15;
+}
+
 export default function ClientsPage() {
   const { getUserRole } = useAuth();
   const canRegisterClients = getUserRole() === 'admin';
@@ -114,8 +169,10 @@ export default function ClientsPage() {
 
   // Barra de busqueda de clientes (temporalmente deshabilitada)
   // const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
+  // Filtro por estado (temporalmente deshabilitado)
+  // const [statusFilter, setStatusFilter] = useState('all');
+  // Paginacion de clientes (temporalmente deshabilitada)
+  // const [currentPage, setCurrentPage] = useState(1);
   const [totalClientsFromApi, setTotalClientsFromApi] = useState(0);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -162,53 +219,43 @@ export default function ClientsPage() {
   }, []);
 
   const filteredClients = useMemo(() => {
-    return clients.filter((client) => {
-      // Logica de busqueda por texto (temporalmente deshabilitada)
-      // const term = searchTerm.trim().toLowerCase();
-      // const matchesSearch =
-      //   !term ||
-      //   client.name.toLowerCase().includes(term) ||
-      //   client.email.toLowerCase().includes(term) ||
-      //   client.phoneNumber.toLowerCase().includes(term) ||
-      //   client.displayId.toLowerCase().includes(term) ||
-      //   client.address.toLowerCase().includes(term);
+    // Logica de busqueda por texto (temporalmente deshabilitada)
+    // const term = searchTerm.trim().toLowerCase();
+    // return clients.filter((client) =>
+    //   !term ||
+    //   client.name.toLowerCase().includes(term) ||
+    //   client.email.toLowerCase().includes(term) ||
+    //   client.phoneNumber.toLowerCase().includes(term) ||
+    //   client.displayId.toLowerCase().includes(term) ||
+    //   client.address.toLowerCase().includes(term)
+    // );
 
-      const matchesStatus =
-        statusFilter === 'all' || client.status === statusFilter;
+    // Filtro por estado (temporalmente deshabilitado)
+    // return clients.filter((client) =>
+    //   statusFilter === 'all' || client.status === statusFilter
+    // );
 
-      return matchesStatus;
-    });
-  }, [clients, statusFilter]);
+    return clients;
+  }, [clients]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-
-  useEffect(() => {
-    if (currentPage !== safeCurrentPage) {
-      setCurrentPage(safeCurrentPage);
-    }
-  }, [currentPage, safeCurrentPage]);
-
-  const paginatedClients = useMemo(() => {
-    const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-    return filteredClients.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredClients, safeCurrentPage]);
-
-  const pageButtons = useMemo(() => {
-    const pages = [];
-    const start = Math.max(1, safeCurrentPage - 2);
-    const end = Math.min(totalPages, start + 4);
-
-    for (let page = start; page <= end; page += 1) {
-      pages.push(page);
-    }
-
-    return pages;
-  }, [safeCurrentPage, totalPages]);
+  // Paginacion de clientes (temporalmente deshabilitada)
+  // const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
+  // const safeCurrentPage = Math.min(currentPage, totalPages);
+  // const paginatedClients = useMemo(() => {
+  //   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  //   return filteredClients.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  // }, [filteredClients, safeCurrentPage]);
+  // const pageButtons = useMemo(() => {
+  //   const pages = [];
+  //   const start = Math.max(1, safeCurrentPage - 2);
+  //   const end = Math.min(totalPages, start + 4);
+  //
+  //   for (let page = start; page <= end; page += 1) {
+  //     pages.push(page);
+  //   }
+  //
+  //   return pages;
+  // }, [safeCurrentPage, totalPages]);
 
   const stats = useMemo(() => {
     const totalVisible = totalClientsFromApi || clients.length;
@@ -226,17 +273,23 @@ export default function ClientsPage() {
 
   const handleCreateClientInputChange = (event) => {
     const { name, value } = event.target;
+
+    const nextValue = name === 'phoneNumber' ? sanitizePhoneInput(value) : value;
+
     setCreateClientForm((previousForm) => ({
       ...previousForm,
-      [name]: value
+      [name]: nextValue
     }));
   };
 
   const handleEditClientInputChange = (event) => {
     const { name, value } = event.target;
+
+    const nextValue = name === 'phoneNumber' ? sanitizePhoneInput(value) : value;
+
     setEditClientForm((previousForm) => ({
       ...previousForm,
-      [name]: value
+      [name]: nextValue
     }));
   };
 
@@ -248,14 +301,27 @@ export default function ClientsPage() {
       return;
     }
 
+    const clientName = createClientForm.name.trim();
+    const phoneNumber = createClientForm.phoneNumber.trim();
+
+    if (hasDuplicatedClientName(clients, clientName)) {
+      setCreateClientError('Ya existe un cliente registrado con ese nombre.');
+      return;
+    }
+
+    if (!isValidPhoneNumber(phoneNumber)) {
+      setCreateClientError('Ingresa un numero de telefono valido (7 a 15 digitos, con + opcional).');
+      return;
+    }
+
     setCreateClientError('');
     setCreatingClient(true);
 
     try {
       const payload = {
-        name: createClientForm.name.trim(),
+        name: clientName,
         email: createClientForm.email.trim(),
-        phoneNumber: createClientForm.phoneNumber.trim() || undefined,
+        phoneNumber: phoneNumber || undefined,
         status: createClientForm.status,
         address: createClientForm.address.trim() || undefined
       };
@@ -299,14 +365,27 @@ export default function ClientsPage() {
       return;
     }
 
+    const clientName = editClientForm.name.trim();
+    const phoneNumber = editClientForm.phoneNumber.trim();
+
+    if (hasDuplicatedClientName(clients, clientName, editingClient.id)) {
+      setEditClientError('Ya existe un cliente registrado con ese nombre.');
+      return;
+    }
+
+    if (!isValidPhoneNumber(phoneNumber)) {
+      setEditClientError('Ingresa un numero de telefono valido (7 a 15 digitos, con + opcional).');
+      return;
+    }
+
     setUpdatingClient(true);
     setEditClientError('');
 
     try {
       const payload = {
-        name: editClientForm.name.trim(),
+        name: clientName,
         email: editClientForm.email.trim(),
-        phoneNumber: editClientForm.phoneNumber.trim() || undefined,
+        phoneNumber: phoneNumber || undefined,
         status: editClientForm.status,
         address: editClientForm.address.trim() || undefined
       };
@@ -364,7 +443,7 @@ export default function ClientsPage() {
       ));
     }
 
-    if (!paginatedClients.length) {
+    if (!filteredClients.length) {
       return (
         <tr>
           <td colSpan="6" className="px-6 py-14 text-center">
@@ -375,7 +454,7 @@ export default function ClientsPage() {
       );
     }
 
-    return paginatedClients.map((client) => (
+    return filteredClients.map((client) => (
       <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
         <td className="px-6 py-4 text-sm">
           <div className="flex items-center gap-3">
@@ -525,6 +604,8 @@ export default function ClientsPage() {
                   </div>
                   */}
 
+                  {/* Filtro por estado (temporalmente deshabilitado) */}
+                  {/*
                   <select
                     value={statusFilter}
                     onChange={(event) => setStatusFilter(event.target.value)}
@@ -536,11 +617,15 @@ export default function ClientsPage() {
                       </option>
                     ))}
                   </select>
+                  */}
                 </div>
 
+                {/* Texto de conteo de clientes (temporalmente deshabilitado) */}
+                {/*
                 <p className="text-sm text-gray-500">
                   Mostrando {filteredClients.length} de {stats.totalVisible} clientes
                 </p>
+                */}
               </div>
 
               <div className="overflow-x-auto">
@@ -559,6 +644,8 @@ export default function ClientsPage() {
                 </table>
               </div>
 
+              {/* Paginacion de clientes (temporalmente deshabilitada) */}
+              {/*
               <div className="px-6 py-4 border-t border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <button
@@ -612,6 +699,7 @@ export default function ClientsPage() {
                   />
                 </div>
               </div>
+              */}
             </section>
 
             <div className="mt-6 border-t border-gray-200 pt-4 text-xs text-gray-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -683,6 +771,8 @@ export default function ClientsPage() {
                   name="phoneNumber"
                   value={createClientForm.phoneNumber}
                   onChange={handleCreateClientInputChange}
+                  inputMode="tel"
+                  pattern="^\\+?[0-9\\s\\-()]{7,20}$"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="+57 300 123 4567"
                 />
@@ -792,6 +882,8 @@ export default function ClientsPage() {
                   name="phoneNumber"
                   value={editClientForm.phoneNumber}
                   onChange={handleEditClientInputChange}
+                  inputMode="tel"
+                  pattern="^\\+?[0-9\\s\\-()]{7,20}$"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
