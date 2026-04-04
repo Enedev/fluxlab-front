@@ -23,6 +23,29 @@ function buildApiUrl(baseUrl, endpoint = '') {
   return `${normalizedBase}/${normalizedEndpoint}`;
 }
 
+async function parseResponseBody(response) {
+  if (response.status === 204) {
+    return null;
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  const responseText = await response.text();
+
+  if (!responseText) {
+    return null;
+  }
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(responseText);
+    } catch {
+      return null;
+    }
+  }
+
+  return responseText;
+}
+
 /**
  * Make authenticated API requests with JWT token
  */
@@ -46,12 +69,18 @@ async function apiRequest(endpoint, options = {}, baseUrl = API_URL) {
       headers
     });
 
+    const responseBody = await parseResponseBody(response);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API Error: ${response.statusText}`);
+      const message =
+        responseBody?.message ||
+        responseBody?.error ||
+        `API Error: ${response.status} ${response.statusText}`;
+
+      throw new Error(message);
     }
 
-    return response.json();
+    return responseBody;
   } catch (error) {
     console.error('API Request failed:', error);
     throw error;
@@ -118,6 +147,34 @@ export const apiService = {
       return apiRequest(endpoint, {}, CLIENTS_API_URL);
     },
 
+    async searchByName(name) {
+      const searchParams = new URLSearchParams();
+
+      if (name && String(name).trim()) {
+        searchParams.append('name', String(name).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query ? `/search?${query}` : '/search';
+
+      return apiRequest(endpoint, {}, CLIENTS_API_URL);
+    },
+
+    async filterByClient(clientId, projectStatus) {
+      const searchParams = new URLSearchParams();
+
+      if (projectStatus && String(projectStatus).trim()) {
+        searchParams.append('projectStatus', String(projectStatus).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query
+        ? `/${clientId}/filter?${query}`
+        : `/${clientId}/filter`;
+
+      return apiRequest(endpoint, {}, CLIENTS_API_URL);
+    },
+
     async getById(id) {
       return apiRequest(`/${id}`, {}, CLIENTS_API_URL);
     },
@@ -136,8 +193,10 @@ export const apiService = {
       }, CLIENTS_API_URL);
     },
 
-    async remove(id) {
-      return apiRequest(`/${id}`, {
+    async remove(id, confirm = true) {
+      const endpoint = `/${id}?confirm=${confirm ? 'true' : 'false'}`;
+
+      return apiRequest(endpoint, {
         method: 'DELETE'
       }, CLIENTS_API_URL);
     }
