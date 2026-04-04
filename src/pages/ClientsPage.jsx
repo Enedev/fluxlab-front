@@ -124,6 +124,8 @@ export default function ClientsPage() {
   const [creatingClient, setCreatingClient] = useState(false);
 
   const [actionMenuClientId, setActionMenuClientId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState(null);
   const [deletingClientId, setDeletingClientId] = useState(null);
 
   const [showEditModal, setShowEditModal] = useState(false);
@@ -322,26 +324,32 @@ export default function ClientsPage() {
     }
   };
 
-  const handleDeleteClient = async (client) => {
+  const handleDeleteClient = (client) => {
     setActionMenuClientId(null);
+    setClientToDelete(client);
+    setShowDeleteModal(true);
+  };
 
-    const shouldDelete = window.confirm(
-      `Estas seguro de eliminar a ${client.name}? Esta accion no se puede deshacer.`
-    );
-
-    if (!shouldDelete) {
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete) {
       return;
     }
 
+    const deletingId = clientToDelete.id;
+
     try {
-      setDeletingClientId(client.id);
-      await apiService.clients.remove(client.id, true);
+      setDeletingClientId(deletingId);
+      await apiService.clients.remove(deletingId, true);
       await loadClients();
+      setShowDeleteModal(false);
+      setClientToDelete(null);
     } catch (err) {
       const errorMessage = String(err?.message || 'No fue posible eliminar el cliente.');
       setError(errorMessage);
+      setShowDeleteModal(false);
     } finally {
       setDeletingClientId(null);
+      setClientToDelete(null);
     }
   };
 
@@ -832,6 +840,41 @@ export default function ClientsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && clientToDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
+              ⚠️
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar cliente?</h3>
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              Esta acción no se puede deshacer. Los proyectos que estén vinculados a {clientToDelete.name} no se eliminarán, pero sí quedarán sin cliente asociado.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={confirmDeleteClient}
+                disabled={deletingClientId === clientToDelete.id}
+                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white px-4 py-3 rounded-xl font-bold transition-all"
+              >
+                {deletingClientId === clientToDelete.id
+                  ? 'Eliminando...'
+                  : 'Sí, eliminar definitivamente'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setClientToDelete(null);
+                }}
+                className="w-full text-gray-500 px-4 py-3 font-bold hover:bg-gray-50 rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
