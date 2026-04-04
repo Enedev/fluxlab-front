@@ -105,12 +105,24 @@ export default function SamplesTable() {
     setSelectedSample(sample);
     
     // Mapear valores existentes del backend si hay
+    // El backend los devuelve como sampleFieldValue en findOne o sample.sampleFieldValues en las relaciones
     const initialFieldValues = {};
-    if (sample.values) {
-      sample.values.forEach(v => {
-        initialFieldValues[v.fieldId] = v.valueText || v.valueNumber || v.valueDate || v.valueBoolean || '';
-      });
-    }
+    const valuesSource = sample.sampleFieldValues || sample.values || [];
+    
+    valuesSource.forEach(v => {
+      // Intentar obtener el ID del campo (puede estar en field.id o fieldId)
+      const fieldId = v.field?.id || v.fieldId;
+      if (fieldId) {
+        // Obtener el valor de la propiedad correcta
+        let val = '';
+        if (v.valueText !== null && v.valueText !== undefined) val = v.valueText;
+        else if (v.valueNumber !== null && v.valueNumber !== undefined) val = v.valueNumber;
+        else if (v.valueDate !== null && v.valueDate !== undefined) val = v.valueDate;
+        else if (v.valueBoolean !== null && v.valueBoolean !== undefined) val = v.valueBoolean;
+        
+        initialFieldValues[fieldId] = val;
+      }
+    });
 
     setFormData({
       code: sample.code,
@@ -185,7 +197,7 @@ export default function SamplesTable() {
       };
 
       if (isEditing && selectedSample) {
-        const updatedSample = await apiService.samples.update(selectedSample.id, samplePayload);
+        const updatedSample = await apiService.samples.updateWithValues(selectedSample.id, samplePayload);
         setSamples(samples.map(s => 
           s.id === selectedSample.id ? updatedSample : s
         ));
@@ -439,7 +451,7 @@ export default function SamplesTable() {
                     required
                     value={formData.templateId}
                     onChange={(e) => setFormData({ ...formData, templateId: e.target.value, fieldValues: {} })}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isEditing}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   >
                     <option value="">Selecciona un template</option>
