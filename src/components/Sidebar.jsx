@@ -34,7 +34,7 @@ const menuItems = [
   },
   {
     id: 'projects',
-    label: 'Projectos',
+    label: 'Proyectos',
     icon: '📁',
     path: '/projects',
     roles: ['authenticated', 'admin', 'user']
