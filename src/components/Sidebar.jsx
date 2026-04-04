@@ -130,7 +130,7 @@ export function Sidebar() {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition"
+          className="p-2 bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 rounded-lg transition"
           title={collapsed ? 'Expand' : 'Collapse'}
         >
           {collapsed ? '→' : '←'}

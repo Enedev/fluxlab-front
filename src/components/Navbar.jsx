@@ -55,13 +55,14 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* Right - Notifications and User Menu */}
+        {/* Right - User Menu */}
         <div className="flex items-center gap-4">
-          {/* Notification Bell (Placeholder) */}
+          {/* Notification Bell (Placeholder) - commented for now
           <button className="relative p-2 text-gray-600 hover:text-gray-900 transition hover:bg-gray-100 rounded-lg">
             🔔
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
+          */}
 
           {/* User Profile Dropdown */}
           <div className="relative">
@@ -99,7 +100,7 @@ export function Navbar() {
                   <p className="text-xs text-gray-500">{user?.email}</p>
                 </div>
 
-                {/* Menu Items */}
+                {/* Menu Items - commented for now
                 <a
                   href="#profile"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
@@ -118,6 +119,7 @@ export function Navbar() {
                 >
                   ❓ Help & Support
                 </a>
+                */}
 
                 {/* Divider */}
                 <div className="border-t border-gray-100 my-1"></div>
