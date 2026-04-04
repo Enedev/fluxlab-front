@@ -51,11 +51,12 @@ export default function TemplatesTable() {
 
   const handleSaveSuccess = (updatedTemplate) => {
     if (selectedTemplate) {
-      // Update existing
+      // Update existing: replace and keep order or move to top if preferred
+      // For now, let's keep it in its place but update the data
       setTemplates(templates.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
     } else {
-      // Add new
-      setTemplates([...templates, updatedTemplate]);
+      // Add new: ALWAYS AT THE TOP
+      setTemplates([updatedTemplate, ...templates]);
     }
     setShowBuilder(false);
     setSelectedTemplate(null);
