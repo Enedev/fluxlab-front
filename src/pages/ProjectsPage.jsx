@@ -129,30 +129,45 @@ function normalizeSampleStatus(value) {
 function getSampleStatusMeta(status) {
   const rawStatus = toSafeText(status);
   const normalized = rawStatus.toLowerCase();
+  const translatedLabel =
+    normalized === 'pending'
+      ? 'Pendiente'
+      : normalized === 'completed'
+        ? 'Completada'
+        : normalized === 'rejected'
+          ? 'Rechazada'
+          : rawStatus || '-';
 
   if (['processed', 'completed', 'done'].includes(normalized)) {
     return {
-      label: rawStatus,
+      label: translatedLabel,
       classes: 'text-emerald-700 bg-emerald-50'
     };
   }
 
   if (['testing', 'in testing', 'in_progress', 'in progress'].includes(normalized)) {
     return {
-      label: rawStatus,
+      label: translatedLabel,
       classes: 'text-amber-700 bg-amber-100'
     };
   }
 
   if (['pending'].includes(normalized)) {
     return {
-      label: rawStatus,
+      label: translatedLabel,
       classes: 'text-blue-700 bg-blue-100'
     };
   }
 
+  if (normalized === 'rejected') {
+    return {
+      label: translatedLabel,
+      classes: 'text-red-700 bg-red-100'
+    };
+  }
+
   return {
-    label: rawStatus || '-',
+    label: translatedLabel,
     classes: 'text-gray-600 bg-gray-200'
   };
 }
@@ -181,9 +196,9 @@ function formatDisplayDate(value) {
     const day = Number(datePartMatch[3]);
 
     const utcDate = new Date(Date.UTC(year, month - 1, day));
-    return utcDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
+    return utcDate.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
       timeZone: 'UTC'
     });
@@ -195,9 +210,9 @@ function formatDisplayDate(value) {
     return '-';
   }
 
-  return parsed.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
+  return parsed.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
     year: 'numeric',
     timeZone: 'UTC'
   });
@@ -244,6 +259,25 @@ function formatApiDate(value) {
 
   // Midday UTC avoids day-shift when backend converts through Date in local timezone.
   return `${datePartMatch[1]}-${datePartMatch[2]}-${datePartMatch[3]}T12:00:00.000Z`;
+}
+
+function formatLocalDateForInput(date) {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function getCreateEndDateBounds() {
+  const today = new Date();
+  const maxDate = new Date(today);
+  maxDate.setFullYear(maxDate.getFullYear() + 5);
+
+  return {
+    min: formatLocalDateForInput(today),
+    max: formatLocalDateForInput(maxDate)
+  };
 }
 
 function normalizeProject(rawProject, index) {
@@ -307,6 +341,7 @@ function normalizeProject(rawProject, index) {
     name: firstNonEmptyText(rawProject?.name, rawProject?.title, `Proyecto ${index + 1}`),
     status,
     description: firstNonEmptyText(rawProject?.description),
+    createdAt: firstNonEmptyText(rawProject?.createdAt, rawProject?.created_at),
     clientName: firstNonEmptyText(
       rawProject?.client?.name,
       rawProject?.clientName,
@@ -395,6 +430,8 @@ function isSameId(left, right) {
 }
 
 export default function ProjectsPage() {
+  const createEndDateBounds = useMemo(() => getCreateEndDateBounds(), []);
+
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -521,6 +558,14 @@ export default function ProjectsPage() {
     return projects.find((project) => isSameId(project.id, editingProjectId)) || null;
   }, [projects, editingProjectId]);
 
+  const editEndDateMin = useMemo(() => {
+    if (!editingProject) {
+      return '';
+    }
+
+    return formatInputDate(editingProject.createdAt);
+  }, [editingProject]);
+
   const expandedProjectSamples = useMemo(() => {
     if (!expandedProject) {
       return [];
@@ -586,10 +631,32 @@ export default function ProjectsPage() {
     event.preventDefault();
 
     const trimmedName = projectForm.name.trim();
+    const trimmedEndDate = projectForm.endDate.trim();
 
     if (!trimmedName) {
       setProjectFormError('El nombre del proyecto es obligatorio.');
       return;
+    }
+
+    if (trimmedEndDate) {
+      const minAllowedEndDate =
+        modalMode === 'edit'
+          ? editEndDateMin
+          : createEndDateBounds.min;
+
+      if (minAllowedEndDate && trimmedEndDate < minAllowedEndDate) {
+        setProjectFormError(
+          modalMode === 'edit'
+            ? 'La fecha de finalizacion no puede ser menor al createdAt del proyecto.'
+            : 'La fecha de finalizacion no puede ser menor a la fecha actual.'
+        );
+        return;
+      }
+
+      if (trimmedEndDate > createEndDateBounds.max) {
+        setProjectFormError('La fecha de finalizacion no puede superar 5 anos desde hoy.');
+        return;
+      }
     }
 
     setSubmittingProject(true);
@@ -949,6 +1016,12 @@ export default function ProjectsPage() {
                   name="endDate"
                   value={projectForm.endDate}
                   onChange={handleProjectFormChange}
+                  min={
+                    modalMode === 'edit'
+                      ? editEndDateMin || undefined
+                      : createEndDateBounds.min
+                  }
+                  max={createEndDateBounds.max}
                   className="w-full px-4 py-3 border border-gray-200 rounded-md bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
                 />
               </div>
