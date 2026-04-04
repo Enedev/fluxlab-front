@@ -25,10 +25,31 @@ export default function SamplesTable() {
     code: '',
     status: 'pending',
     templateId: '',
-    projectId: ''
+    projectId: '',
+    fieldValues: {} // Para almacenar los valores dinámicos
   });
+  const [selectedTemplateObj, setSelectedTemplateObj] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Cargar template seleccionado para mostrar sus campos
+  useEffect(() => {
+    if (formData.templateId) {
+      const template = templates.find(t => t.id === formData.templateId);
+      setSelectedTemplateObj(template || null);
+      
+      // Inicializar fieldValues si no existen
+      if (template?.fields && !isEditing) {
+        const initialValues = {};
+        template.fields.forEach(field => {
+          initialValues[field.id] = field.dataType === 'boolean' ? false : '';
+        });
+        setFormData(prev => ({ ...prev, fieldValues: initialValues }));
+      }
+    } else {
+      setSelectedTemplateObj(null);
+    }
+  }, [formData.templateId, templates, isEditing]);
 
   // Load samples and templates on component mount
   useEffect(() => {
@@ -74,7 +95,7 @@ export default function SamplesTable() {
 
   const handleCreateNew = () => {
     setIsEditing(false);
-    setFormData({ code: '', status: 'pending', templateId: '', projectId: '' });
+    setFormData({ code: '', status: 'pending', templateId: '', projectId: '', fieldValues: {} });
     setSelectedSample(null);
     setShowModal(true);
   };
@@ -82,11 +103,21 @@ export default function SamplesTable() {
   const handleEdit = (sample) => {
     setIsEditing(true);
     setSelectedSample(sample);
+    
+    // Mapear valores existentes del backend si hay
+    const initialFieldValues = {};
+    if (sample.values) {
+      sample.values.forEach(v => {
+        initialFieldValues[v.fieldId] = v.valueText || v.valueNumber || v.valueDate || v.valueBoolean || '';
+      });
+    }
+
     setFormData({
       code: sample.code,
       status: sample.status,
       templateId: sample.template?.id || '',
-      projectId: sample.project?.id || ''
+      projectId: sample.project?.id || '',
+      fieldValues: initialFieldValues
     });
     setShowModal(true);
   };
@@ -135,27 +166,35 @@ export default function SamplesTable() {
     setError(null);
     
     try {
+      // Preparar datos para el backend
+      const samplePayload = {
+        code: formData.code,
+        status: formData.status,
+        templateId: formData.templateId,
+        projectId: formData.projectId,
+        values: Object.entries(formData.fieldValues).map(([fieldId, value]) => {
+          const field = selectedTemplateObj?.fields?.find(f => f.id === fieldId);
+          return {
+            fieldId,
+            valueText: field?.dataType === 'text' ? String(value) : null,
+            valueNumber: field?.dataType === 'number' ? Number(value) : null,
+            valueDate: field?.dataType === 'date' ? value : null,
+            valueBoolean: field?.dataType === 'boolean' ? Boolean(value) : null
+          };
+        })
+      };
+
       if (isEditing && selectedSample) {
-        const updatedSample = await apiService.samples.update(selectedSample.id, {
-          code: formData.code,
-          status: formData.status,
-          templateId: formData.templateId,
-          projectId: formData.projectId
-        });
+        const updatedSample = await apiService.samples.update(selectedSample.id, samplePayload);
         setSamples(samples.map(s => 
           s.id === selectedSample.id ? updatedSample : s
         ));
       } else {
-        const newSample = await apiService.samples.create({
-          code: formData.code,
-          status: formData.status,
-          templateId: formData.templateId,
-          projectId: formData.projectId
-        });
+        const newSample = await apiService.samples.createWithValues(samplePayload);
         setSamples([...samples, newSample]);
       }
       setShowModal(false);
-      setFormData({ code: '', status: 'pending', templateId: '', projectId: '' });
+      setFormData({ code: '', status: 'pending', templateId: '', projectId: '', fieldValues: {} });
       setSelectedSample(null);
       setIsEditing(false);
     } catch (err) {
@@ -399,7 +438,7 @@ export default function SamplesTable() {
                   <select
                     required
                     value={formData.templateId}
-                    onChange={(e) => setFormData({ ...formData, templateId: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, templateId: e.target.value, fieldValues: {} })}
                     disabled={isSubmitting}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   >
@@ -411,6 +450,56 @@ export default function SamplesTable() {
                     ))}
                   </select>
                 </div>
+
+                {/* Dynamic Fields from Template */}
+                {selectedTemplateObj && selectedTemplateObj.fields && selectedTemplateObj.fields.length > 0 && (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                    <h4 className="text-xs font-black text-blue-900/40 uppercase tracking-widest border-b border-gray-200 pb-2">
+                      Campos de la Plantilla
+                    </h4>
+                    {selectedTemplateObj.fields.map(field => (
+                      <div key={field.id}>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">
+                          {field.name} {field.required && <span className="text-red-500">*</span>}
+                        </label>
+                        {field.dataType === 'boolean' ? (
+                          <input
+                            type="checkbox"
+                            checked={formData.fieldValues[field.id] || false}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              fieldValues: { ...formData.fieldValues, [field.id]: e.target.checked }
+                            })}
+                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        ) : field.dataType === 'date' ? (
+                          <input
+                            type="date"
+                            required={field.required}
+                            value={formData.fieldValues[field.id] || ''}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              fieldValues: { ...formData.fieldValues, [field.id]: e.target.value }
+                            })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        ) : (
+                          <input
+                            type={field.dataType === 'number' ? 'number' : 'text'}
+                            required={field.required}
+                            value={formData.fieldValues[field.id] || ''}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              fieldValues: { ...formData.fieldValues, [field.id]: e.target.value }
+                            })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder={`Ingrese ${field.name.toLowerCase()}...`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Status Field */}
                 <div>

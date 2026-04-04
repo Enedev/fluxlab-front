@@ -8,22 +8,17 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import TemplateBuilder from './TemplateBuilder';
 
 export default function TemplatesTable() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showBuilder, setShowBuilder] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: ''
-  });
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load templates on component mount
   useEffect(() => {
@@ -45,20 +40,30 @@ export default function TemplatesTable() {
   };
 
   const handleCreateNew = () => {
-    setIsEditing(false);
-    setFormData({ name: '', description: '' });
     setSelectedTemplate(null);
-    setShowModal(true);
+    setShowBuilder(true);
   };
 
   const handleEdit = (template) => {
-    setIsEditing(true);
     setSelectedTemplate(template);
-    setFormData({
-      name: template.name,
-      description: template.description || ''
-    });
-    setShowModal(true);
+    setShowBuilder(true);
+  };
+
+  const handleSaveSuccess = (updatedTemplate) => {
+    if (selectedTemplate) {
+      // Update existing
+      setTemplates(templates.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
+    } else {
+      // Add new
+      setTemplates([...templates, updatedTemplate]);
+    }
+    setShowBuilder(false);
+    setSelectedTemplate(null);
+  };
+
+  const handleCancelBuilder = () => {
+    setShowBuilder(false);
+    setSelectedTemplate(null);
   };
 
   const handleDelete = (id) => {
@@ -81,291 +86,126 @@ export default function TemplatesTable() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validate form data
-    if (!formData.name || formData.name.trim() === '') {
-      setError('El nombre del template es requerido');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-    
-    try {
-      if (isEditing && selectedTemplate) {
-        const updatedTemplate = await apiService.templates.update(selectedTemplate.id, formData);
-        setTemplates(templates.map(t => 
-          t.id === selectedTemplate.id ? updatedTemplate : t
-        ));
-      } else {
-        const newTemplate = await apiService.templates.create(formData);
-        setTemplates([...templates, newTemplate]);
-      }
-      setShowModal(false);
-      setFormData({ name: '', description: '' });
-      setSelectedTemplate(null);
-      setIsEditing(false);
-    } catch (err) {
-      console.error('Error saving template:', err);
-      setError(err.message || 'Error al guardar el template');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  if (showBuilder) {
+    return (
+      <TemplateBuilder 
+        template={selectedTemplate}
+        onSave={handleSaveSuccess} 
+        onCancel={handleCancelBuilder} 
+      />
+    );
+  }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Cargando templates...</div>
+        <div className="text-gray-500 italic">Cargando templates...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 animate-in fade-in duration-300">
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          {error}
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 font-medium">
+          ⚠️ {error}
         </div>
       )}
 
       {/* Header with Create Button */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Templates</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Plantillas de Datos</h2>
+          <p className="text-sm text-gray-500">Define la estructura para tus protocolos de laboratorio</p>
+        </div>
         <button
           onClick={handleCreateNew}
-          className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+          className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-green-100"
         >
           <span>+</span>
-          <span>Crear Template</span>
+          <span>Nueva Plantilla</span>
         </button>
       </div>
 
-      {/* Templates Summary */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
-        <div className="text-sm text-gray-600">
-          <span className="font-semibold text-gray-900">{templates.length}</span> Templates creados
-        </div>
+      {/* Templates List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {templates.length === 0 ? (
+          <div className="col-span-full bg-white rounded-2xl border-2 border-dashed border-gray-100 p-12 text-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl text-gray-300">
+              📋
+            </div>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No hay plantillas creadas</p>
+          </div>
+        ) : (
+          templates.map((template) => (
+            <div 
+              key={template.id} 
+              className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group flex flex-col h-full relative"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-xl">
+                  📄
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    onClick={() => handleEdit(template)}
+                    className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg"
+                    title="Editar"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDelete(template.id)}
+                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                    title="Eliminar"
+                  >
+                    🗑
+                  </button>
+                </div>
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{template.name}</h3>
+              <p className="text-sm text-gray-500 line-clamp-2 mb-4 flex-1">
+                {template.description || 'Sin descripción disponible para esta plantilla.'}
+              </p>
+              
+              <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  {template.fields?.length || 0} Campos
+                </span>
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-lg uppercase tracking-widest">
+                  Ver Detalles
+                </span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
-      {/* Templates Table */}
-      {templates.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-          <p className="text-gray-500">No hay templates creados aún</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">NOMBRE</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">DESCRIPCIÓN</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">CREADO</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">ACCIONES</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {templates.map((template) => (
-                  <tr key={template.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center text-blue-600 font-semibold">
-                          📋
-                        </div>
-                        <span className="font-medium text-gray-900">{template.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {template.description || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {formatDate(template.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEdit(template)}
-                          className="p-2 hover:bg-gray-100 rounded lg text-gray-600 hover:text-blue-600 transition"
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDelete(template.id)}
-                          className="p-2 hover:bg-gray-100 rounded text-gray-600 hover:text-red-600 transition"
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Create/Edit Modal - Design like Edit Sample Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md overflow-hidden">
-            {/* Modal Header */}
-            <div className="bg-green-500 text-white px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="text-2xl">📋</div>
-                <div>
-                  <h3 className="font-semibold text-lg">
-                    {isEditing ? `Editar Template: ${selectedTemplate?.name}` : 'Crear Template'}
-                  </h3>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowModal(false);
-                  setFormData({ name: '', description: '' });
-                  setSelectedTemplate(null);
-                  setIsEditing(false);
-                  setError(null);
-                }}
-                className="text-white hover:bg-green-600 p-1 rounded transition"
-              >
-                ✕
-              </button>
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
+              ⚠️
             </div>
-
-            {/* Modal Body */}
-            <div className="p-6">
-              {/* Error Message */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-red-700 text-sm">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Name Field */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                    Nombre *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={150}
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    disabled={isSubmitting}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-                    placeholder="Ej: Water Analysis Template"
-                  />
-                </div>
-
-                {/* Description Field */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                    Descripción
-                  </label>
-                  <textarea
-                    maxLength={255}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    disabled={isSubmitting}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-                    placeholder="Descripción del template"
-                    rows={4}
-                  />
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      setFormData({ name: '', description: '' });
-                      setSelectedTemplate(null);
-                      setIsEditing(false);
-                      setError(null);
-                    }}
-                    disabled={isSubmitting}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
-                  >
-                    {isSubmitting ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Crear'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal - Alert Style */}
-      {showDeleteModal && templateToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm">
-            {/* Modal Header */}
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0 4v2m0-4a9 9 0 11-18 0 9 9 0 0118 0zm-2 3a1 1 0 11-2 0 1 1 0 012 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Eliminar Template
-                  </h3>
-                  <p className="mt-2 text-sm text-gray-600">
-                    ¿Estás seguro de que quieres eliminar el template <span className="font-semibold">{templates.find(t => t.id === templateToDelete)?.name}</span>? Esta acción no puede ser deshacha.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 bg-gray-50 flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setTemplateToDelete(null);
-                }}
-                disabled={isSubmitting}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-              >
-                Cancelar
-              </button>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar plantilla?</h3>
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              Esta acción no puede deshacerse. Asegúrate de que no haya muestras usando esta plantilla.
+            </p>
+            <div className="flex flex-col gap-2">
               <button
                 onClick={confirmDelete}
-                disabled={isSubmitting}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                className="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-bold transition-all"
               >
-                {isSubmitting ? 'Eliminando...' : 'Eliminar'}
+                Sí, eliminar definitivamente
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="w-full text-gray-500 px-4 py-3 font-bold hover:bg-gray-50 rounded-xl transition-all"
+              >
+                Cancelar
               </button>
             </div>
           </div>

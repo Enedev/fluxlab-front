@@ -202,6 +202,13 @@ export const apiService = {
       });
     },
 
+    async createWithValues(sampleData) {
+      return apiRequest('/samples/with-values', {
+        method: 'POST',
+        body: JSON.stringify(sampleData)
+      });
+    },
+
     async update(id, sampleData) {
       return apiRequest(`/samples/${id}`, {
         method: 'PATCH',
