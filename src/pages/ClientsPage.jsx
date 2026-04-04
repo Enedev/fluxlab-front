@@ -112,7 +112,8 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [searchTerm, setSearchTerm] = useState('');
+  // Barra de busqueda de clientes (temporalmente deshabilitada)
+  // const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalClientsFromApi, setTotalClientsFromApi] = useState(0);
@@ -160,25 +161,26 @@ export default function ClientsPage() {
 
   const filteredClients = useMemo(() => {
     return clients.filter((client) => {
-      const term = searchTerm.trim().toLowerCase();
-      const matchesSearch =
-        !term ||
-        client.name.toLowerCase().includes(term) ||
-        client.email.toLowerCase().includes(term) ||
-        client.phoneNumber.toLowerCase().includes(term) ||
-        client.displayId.toLowerCase().includes(term) ||
-        client.address.toLowerCase().includes(term);
+      // Logica de busqueda por texto (temporalmente deshabilitada)
+      // const term = searchTerm.trim().toLowerCase();
+      // const matchesSearch =
+      //   !term ||
+      //   client.name.toLowerCase().includes(term) ||
+      //   client.email.toLowerCase().includes(term) ||
+      //   client.phoneNumber.toLowerCase().includes(term) ||
+      //   client.displayId.toLowerCase().includes(term) ||
+      //   client.address.toLowerCase().includes(term);
 
       const matchesStatus =
         statusFilter === 'all' || client.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      return matchesStatus;
     });
-  }, [clients, searchTerm, statusFilter]);
+  }, [clients, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -501,6 +503,8 @@ export default function ClientsPage() {
             <section className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex flex-col sm:flex-row gap-3">
+                  {/* Barra de busqueda de clientes (temporalmente deshabilitada) */}
+                  {/*
                   <div className="relative">
                     <input
                       type="text"
@@ -511,6 +515,7 @@ export default function ClientsPage() {
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
                   </div>
+                  */}
 
                   <select
                     value={statusFilter}
