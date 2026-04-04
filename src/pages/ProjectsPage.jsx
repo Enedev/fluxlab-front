@@ -409,6 +409,8 @@ export default function ProjectsPage() {
   const [projectFormError, setProjectFormError] = useState('');
   const [submittingProject, setSubmittingProject] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState(null);
 
   const loadPageData = async () => {
     setLoading(true);
@@ -622,24 +624,29 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleDeleteProject = async (project) => {
-    const shouldDelete = window.confirm(
-      `¿Seguro que deseas eliminar ${project.name}? Esta accion no se puede deshacer.`
-    );
+  const handleDeleteProject = (project) => {
+    setProjectToDelete(project);
+    setShowDeleteModal(true);
+  };
 
-    if (!shouldDelete) {
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) {
       return;
     }
 
     try {
-      setDeletingProjectId(project.id);
-      await apiService.projects.remove(project.id);
+      setDeletingProjectId(projectToDelete.id);
+      await apiService.projects.remove(projectToDelete.id);
       await loadPageData();
-      if (isSameId(expandedProjectId, project.id)) {
+      if (isSameId(expandedProjectId, projectToDelete.id)) {
         setExpandedProjectId(null);
       }
+      setShowDeleteModal(false);
+      setProjectToDelete(null);
     } catch (deleteError) {
       setError(String(deleteError?.message || 'No se pudo eliminar el proyecto.'));
+      setShowDeleteModal(false);
+      setProjectToDelete(null);
     } finally {
       setDeletingProjectId(null);
     }
@@ -660,7 +667,7 @@ export default function ProjectsPage() {
           <div className="p-6 md:p-8">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900 mt-2">Proyectos de Investigacion</h1>
+                <h1 className="text-4xl font-bold text-gray-900 mt-2">Proyectos de Investigación</h1>
               </div>
 
               <button
@@ -984,6 +991,40 @@ export default function ProjectsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && projectToDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
+              ⚠️
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar proyecto?</h3>
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              Esta acción no se puede deshacer. El proyecto {projectToDelete.name} y todas sus muestras asociadas se eliminarán definitivamente del sistema.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={confirmDeleteProject}
+                disabled={deletingProjectId === projectToDelete.id}
+                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white px-4 py-3 rounded-xl font-bold transition-all"
+              >
+                {deletingProjectId === projectToDelete.id
+                  ? 'Eliminando...'
+                  : 'Si, eliminar definitivamente'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setProjectToDelete(null);
+                }}
+                className="w-full text-gray-500 px-4 py-3 font-bold hover:bg-gray-50 rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
