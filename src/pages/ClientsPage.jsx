@@ -7,6 +7,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   faEllipsisVertical,
+  faPenToSquare,
+  faTrashCan,
   faTriangleExclamation,
   faUsers,
   faXmark
@@ -169,6 +171,8 @@ function isValidPhoneNumber(value) {
 export default function ClientsPage() {
   const { getUserRole } = useAuth();
   const canRegisterClients = getUserRole() === 'admin';
+  const canManageClientActions = canRegisterClients;
+  const tableColumnCount = canManageClientActions ? 6 : 5;
 
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -352,6 +356,10 @@ export default function ClientsPage() {
   };
 
   const openEditModal = (client) => {
+    if (!canManageClientActions) {
+      return;
+    }
+
     setActionMenuClientId(null);
     setEditingClient(client);
     setEditClientError('');
@@ -367,6 +375,11 @@ export default function ClientsPage() {
 
   const handleUpdateClient = async (event) => {
     event.preventDefault();
+
+    if (!canManageClientActions) {
+      setEditClientError('Solo administradores pueden editar clientes.');
+      return;
+    }
 
     if (!editingClient?.id) {
       return;
@@ -411,12 +424,23 @@ export default function ClientsPage() {
   };
 
   const handleDeleteClient = (client) => {
+    if (!canManageClientActions) {
+      return;
+    }
+
     setActionMenuClientId(null);
     setClientToDelete(client);
     setShowDeleteModal(true);
   };
 
   const confirmDeleteClient = async () => {
+    if (!canManageClientActions) {
+      setError('Solo administradores pueden eliminar clientes.');
+      setShowDeleteModal(false);
+      setClientToDelete(null);
+      return;
+    }
+
     if (!clientToDelete) {
       return;
     }
@@ -441,19 +465,21 @@ export default function ClientsPage() {
 
   const renderTableBody = () => {
     if (loading) {
-      return Array.from({ length: 5 }).map((_, index) => (
-        <tr key={`loading-row-${index}`} className="border-b border-gray-100">
-          <td colSpan="6" className="px-6 py-4">
-            <div className="h-4 bg-gray-100 rounded animate-pulse" />
+      return (
+        <tr>
+          <td colSpan={tableColumnCount} className="px-6 py-14">
+            <div className="flex items-center justify-center">
+              <p className="text-gray-500">Cargando clientes...</p>
+            </div>
           </td>
         </tr>
-      ));
+      );
     }
 
     if (!filteredClients.length) {
       return (
         <tr>
-          <td colSpan="6" className="px-6 py-14 text-center">
+          <td colSpan={tableColumnCount} className="px-6 py-14 text-center">
             <p className="text-gray-500 font-medium">No se encontraron clientes con los filtros seleccionados.</p>
             <p className="text-sm text-gray-400 mt-1">Ajusta la busqueda o registra un cliente nuevo.</p>
           </td>
@@ -486,42 +512,54 @@ export default function ClientsPage() {
           </span>
         </td>
 
-        <td className="px-6 py-4 text-sm text-right">
-          <div className="relative inline-block text-left">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center !p-0 w-8 h-8 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-              onClick={() => {
-                setActionMenuClientId((previousId) =>
-                  previousId === client.id ? null : client.id
-                );
-              }}
-              title="Acciones del cliente"
-            >
-              <Icon icon={faEllipsisVertical} size={14} color="currentColor" />
-            </button>
+        {canManageClientActions && (
+          <td className="px-6 py-4 text-sm text-right">
+            <div className="relative inline-block text-left">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center !p-0 w-8 h-8 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                onClick={() => {
+                  setActionMenuClientId((previousId) =>
+                    previousId === client.id ? null : client.id
+                  );
+                }}
+                title="Acciones del cliente"
+              >
+                <Icon icon={faEllipsisVertical} size={14} color="currentColor" />
+              </button>
 
-            {actionMenuClientId === client.id && (
-              <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => openEditModal(client)}
-                  className="w-full px-4 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
-                >
-                  Editar cliente
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteClient(client)}
-                  disabled={deletingClientId === client.id}
-                  className="w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-60"
-                >
-                  {deletingClientId === client.id ? 'Eliminando...' : 'Eliminar cliente'}
-                </button>
-              </div>
-            )}
-          </div>
-        </td>
+              {actionMenuClientId === client.id && (
+                <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(client)}
+                    className="w-full px-4 py-2 text-left text-sm text-blue-700 hover:bg-blue-50"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <Icon icon={faPenToSquare} size={12} color="currentColor" />
+                      Editar
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteClient(client)}
+                    disabled={deletingClientId === client.id}
+                    className="w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    {deletingClientId === client.id ? (
+                      'Eliminando...'
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        <Icon icon={faTrashCan} size={12} color="currentColor" />
+                        Eliminar
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </td>
+        )}
       </tr>
     ));
   };
@@ -644,7 +682,9 @@ export default function ClientsPage() {
                       <th className="px-6 py-4 text-left text-xs font-semibold tracking-widest text-gray-500 uppercase">Telefono</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold tracking-widest text-gray-500 uppercase">Proyectos</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold tracking-widest text-gray-500 uppercase">Estado</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold tracking-widest text-gray-500 uppercase">Acciones</th>
+                      {canManageClientActions && (
+                        <th className="px-6 py-4 text-right text-xs font-semibold tracking-widest text-gray-500 uppercase">Acciones</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>{renderTableBody()}</tbody>
@@ -712,10 +752,8 @@ export default function ClientsPage() {
             <div className="mt-6 border-t border-gray-200 pt-4 text-xs text-gray-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <p className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                SISTEMA EN LINEA
+                {loading ? 'SINCRONIZANDO CLIENTES...' : 'SISTEMA EN LINEA'}
               </p>
-              <p>CERTIFICACION CLIA V2.4</p>
-              <p>© 2026 FLUXLAB SISTEMAS DE PRECISION</p>
             </div>
           </div>
         </main>
@@ -831,7 +869,7 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {showEditModal && editingClient && (
+      {canManageClientActions && showEditModal && editingClient && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-xl bg-white rounded-xl border border-gray-200 shadow-xl">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -944,7 +982,7 @@ export default function ClientsPage() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && clientToDelete && (
+      {canManageClientActions && showDeleteModal && clientToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
