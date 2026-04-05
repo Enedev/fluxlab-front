@@ -9,7 +9,8 @@ const INITIAL_PROJECT_FORM = {
   name: '',
   clientId: '',
   endDate: '',
-  description: ''
+  description: '',
+  status: 'active'
 };
 
 function toNumber(value, fallback = 0) {
@@ -87,6 +88,10 @@ function normalizeProjectStatus(value) {
   }
 
   return 'active';
+}
+
+function normalizeEditableProjectStatus(value) {
+  return normalizeProjectStatus(value) === 'inactive' ? 'inactive' : 'active';
 }
 
 function getProjectStatusMeta(status) {
@@ -608,7 +613,8 @@ export default function ProjectsPage() {
       name: project.name || '',
       clientId: project.clientId || matchingClient?.id || '',
       endDate: formatInputDate(project.endDate || project.dueDate),
-      description: project.description || ''
+      description: project.description || '',
+      status: normalizeEditableProjectStatus(project.status)
     });
     setProjectFormError('');
     setShowProjectModal(true);
@@ -666,15 +672,18 @@ export default function ProjectsPage() {
 
     try {
       const normalizedEndDate = formatApiDate(projectForm.endDate);
+      const normalizedStatus =
+        modalMode === 'edit'
+          ? projectForm.status === 'inactive'
+            ? 'inactive'
+            : 'active'
+          : 'active';
 
       const payload = {
         name: trimmedName,
         description: projectForm.description.trim() || undefined,
         endDate: normalizedEndDate,
-        status:
-          modalMode === 'edit'
-            ? editingProject?.status || 'active'
-            : 'active',
+        status: normalizedStatus,
         clientId: projectForm.clientId || undefined
       };
 
@@ -864,12 +873,7 @@ export default function ProjectsPage() {
 
                         <div className="px-5 md:px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
                           <h3 className="text-base font-semibold text-gray-900">Muestras Recientes</h3>
-                          <button
-                            type="button"
-                            className="bg-transparent! border-0! p-0! text-xs font-semibold tracking-wide text-emerald-600 hover:text-emerald-700 transition-colors"
-                          >
-                            + VINCULAR MUESTRA
-                          </button>
+
                         </div>
 
                         <div className="overflow-x-auto">
@@ -880,7 +884,7 @@ export default function ProjectsPage() {
                                 <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Estado</th>
                                 <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Plantilla</th>
                                 <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Creado En</th>
-                                <th className="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500">Accion</th>
+                                <th className="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500"></th>
                               </tr>
                             </thead>
 
@@ -909,12 +913,12 @@ export default function ProjectsPage() {
                                       <td className="px-6 py-4 text-sm text-gray-600">{sampleRow.template}</td>
                                       <td className="px-6 py-4 text-sm text-gray-500">{formatDisplayDate(sampleRow.createdAt)}</td>
                                       <td className="px-6 py-4 text-right text-sm">
-                                        <button
+                                        {/* <button
                                           type="button"
                                           className="bg-transparent! border-0! p-0! text-emerald-600 font-semibold hover:text-emerald-700 transition-colors"
                                         >
                                           Ver
-                                        </button>
+                                        </button> */}
                                       </td>
                                     </tr>
                                   );
@@ -1008,6 +1012,23 @@ export default function ProjectsPage() {
                   ))}
                 </select>
               </div>
+
+              {modalMode === 'edit' && (
+                <div>
+                  <label className="block text-xs font-bold tracking-[0.18em] text-gray-600 uppercase mb-2">
+                    Estado
+                  </label>
+                  <select
+                    name="status"
+                    value={projectForm.status}
+                    onChange={handleProjectFormChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-md bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                  >
+                    <option value="active">Activo</option>
+                    <option value="inactive">Inactivo</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold tracking-[0.18em] text-gray-600 uppercase mb-2">
