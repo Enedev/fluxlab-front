@@ -31,7 +31,6 @@ export default function SamplesTable() {
   const [filterStatus, setFilterStatus] = useState('all');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState(null);
 
   // Quick Add State (for the "+" in templates)
   const [quickAddRow, setQuickAddRow] = useState({
@@ -344,41 +343,6 @@ export default function SamplesTable() {
                 </div>
               </div>
 
-              {/* +NEW TEMPLATE Dropdown */}
-              <div className="pl-4 relative">
-                <button 
-                  className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-bold text-xs bg-teal-50 px-3 py-1.5 rounded-md border border-teal-100 transition"
-                  onClick={() => setActiveDropdown(activeDropdown === project.id ? null : project.id)}
-                >
-                  <span className="text-base leading-none">+</span>
-                  <span>NEW TEMPLATE</span>
-                </button>
-
-                {activeDropdown === project.id && (
-                  <div className="absolute left-4 top-10 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-20 py-2 max-h-60 overflow-y-auto">
-                    {templates.map(t => (
-                      <button
-                        key={t.id}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-teal-50 transition flex items-center justify-between"
-                        onClick={() => {
-                          setQuickAddRow({
-                            ...quickAddRow,
-                            templateId: t.id,
-                            projectId: project.id,
-                            code: "NEW-" + Math.floor(Math.random()*1000),
-                            fieldValues: {}
-                          });
-                          setActiveDropdown(null);
-                        }}
-                      >
-                        <span className="font-medium">{t.name}</span>
-                        <span className="text-[9px] bg-gray-100 text-gray-400 px-1 rounded font-black">ADD</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Templates under Project */}
               <div className="space-y-6">
                 {project.templates.map(template => (
@@ -572,42 +536,6 @@ export default function SamplesTable() {
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                ))}
-
-                {/* Initializing Template (from Dropdown) */}
-                {templates.filter(t => quickAddRow.templateId === t.id && quickAddRow.projectId === project.id && !project.templates.some(pt => pt.id === t.id)).map(template => (
-                  <div key={`${project.id}-${template.id}-new`} className="ml-4 bg-white border border-teal-200 rounded-xl overflow-hidden shadow-sm border-dashed">
-                      <div className="bg-teal-50/20 px-6 py-3 border-b border-teal-100 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-teal-400">??</span>
-                          <h3 className="text-teal-700 font-bold">New Table: {template.name}</h3>
-                        </div>
-                        <span className="text-[9px] font-black text-teal-400 italic">INITIALIZING...</span>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <tbody>
-                            <tr>
-                              <td className="px-6 py-3">
-                                <input type="text" autoFocus placeholder="CODE-001" className="bg-transparent border-none focus:ring-0 text-xs font-bold text-teal-900 w-full" value={quickAddRow.code} onChange={(e) => setQuickAddRow({ ...quickAddRow, code: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(template.id, project.id); }} />
-                              </td>
-                              {template.fields?.map(field => (
-                                <td key={field.id} className="px-6 py-3">
-                                  {field.dataType === 'boolean' ? (
-                                    <input type="checkbox" className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" checked={!!quickAddRow.fieldValues[field.id]} onChange={(e) => setQuickAddRow({ ...quickAddRow, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.checked } })} />
-                                  ) : (
-                                    <input type={field.dataType === "number" ? "number" : "text"} className="bg-transparent border-none focus:ring-0 text-xs font-black text-teal-900 w-full" value={quickAddRow.fieldValues[field.id] || ""} onChange={(e) => setQuickAddRow({ ...quickAddRow, fieldValues: { ...quickAddRow.fieldValues, [field.id]: e.target.value } })} onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(template.id, project.id); }} />
-                                  )}
-                                </td>
-                              ))}
-                              <td className="px-6 py-3 text-right">
-                                <button onClick={() => handleQuickAdd(template.id, project.id)} className="text-teal-600 font-bold text-lg">+</button>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
                   </div>
                 ))}
               </div>
