@@ -7,83 +7,91 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import {
+  faFlask,
+  faFolderOpen,
+  faUsers,
+  faUserGear
+} from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logoConFondo.jpeg';
+import Icon from './Icon';
 
 const menuItems = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: '📊',
-    path: '/dashboard',
-    roles: ['authenticated', 'admin', 'user']
-  },
+  // {
+  //   id: 'dashboard',
+  //   label: 'Dashboard',
+  //   icon: 'dashboard-icon',
+  //   path: '/dashboard',
+  //   roles: ['authenticated', 'admin', 'user']
+  // },
   {
     id: 'clients',
     label: 'Clientes',
-    icon: '👥',
+    icon: faUsers,
     path: '/clients',
     roles: ['authenticated', 'admin', 'user']
   },
   {
     id: 'users',
     label: 'Gestión de Usuarios',
-    icon: '👤',
+    icon: faUserGear,
     path: '/users',
     roles: ['admin']
   },
   {
     id: 'projects',
     label: 'Proyectos',
-    icon: '📁',
+    icon: faFolderOpen,
     path: '/projects',
     roles: ['authenticated', 'admin', 'user']
   },
   {
     id: 'samples',
     label: 'Muestras',
-    icon: '🧪',
+    icon: faFlask,
     path: '/samples',
     roles: ['authenticated', 'admin', 'user']
   },
-  {
-    id: 'tests',
-    label: 'Pruebas',
-    icon: '🔬',
-    path: '/tests',
-    roles: ['authenticated', 'admin', 'user']
-  },
-  {
-    id: 'reports',
-    label: 'Reportes',
-    icon: '📋',
-    path: '/reports',
-    roles: ['authenticated', 'admin', 'user']
-  },
-  {
-    id: 'documents',
-    label: 'Documentos',
-    icon: '📄',
-    path: '/documents',
-    roles: ['authenticated', 'admin', 'user']
-  }
+  // {
+  //   id: 'tests',
+  //   label: 'Pruebas',
+  //   icon: 'tests-icon',
+  //   path: '/tests',
+  //   roles: ['authenticated', 'admin', 'user']
+  // },
+  // {
+  //   id: 'reports',
+  //   label: 'Reportes',
+  //   icon: 'reports-icon',
+  //   path: '/reports',
+  //   roles: ['authenticated', 'admin', 'user']
+  // },
+  // {
+  //   id: 'documents',
+  //   label: 'Documentos',
+  //   icon: 'documents-icon',
+  //   path: '/documents',
+  //   roles: ['authenticated', 'admin', 'user']
+  // }
 ];
 
 const bottomMenuItems = [
-  {
-    id: 'support',
-    label: 'Support',
-    icon: '❓',
-    path: '/support',
-    roles: ['authenticated', 'admin', 'user']
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: '⚙️',
-    path: '/settings',
-    roles: ['authenticated', 'admin', 'user']
-  }
+  
+  // {
+  //   id: 'support',
+  //   label: 'Support',
+  //   icon: faQuestionCircle,
+  //   path: '/support',
+  //   roles: ['authenticated', 'admin', 'user']
+  // },
+  // {
+  //   id: 'settings',
+  //   label: 'Settings',
+  //   icon: faSliders,
+  //   path: '/settings',
+  //   roles: ['authenticated', 'admin', 'user']
+  // }
 ];
 
 export function Sidebar() {
@@ -92,6 +100,17 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   
   const userRole = getUserRole();
+
+  const getRoleDisplayLabel = (role) => {
+    switch (role) {
+      case 'technician':
+        return 'Técnico';
+      case 'researcher':
+        return 'Investigador';
+      default:
+        return role || 'user';
+    }
+  };
 
   /**
    * Check if menu item should be visible based on user role
@@ -155,7 +174,9 @@ export function Sidebar() {
               }`}
               title={collapsed ? item.label : ''}
             >
-              <span className="text-xl flex-shrink-0">{item.icon}</span>
+              <span className="text-xl flex-shrink-0">
+                <Icon icon={item.icon} size={18} color="currentColor" />
+              </span>
               {!collapsed && <span className="font-medium text-sm">{item.label}</span>}
             </Link>
           );
@@ -180,7 +201,9 @@ export function Sidebar() {
               }`}
               title={collapsed ? item.label : ''}
             >
-              <span className="text-xl flex-shrink-0">{item.icon}</span>
+              <span className="text-xl flex-shrink-0">
+                <Icon icon={item.icon} size={18} color="currentColor" />
+              </span>
               {!collapsed && <span className="font-medium text-sm">{item.label}</span>}
             </Link>
           );
@@ -191,12 +214,12 @@ export function Sidebar() {
       {!collapsed && (
         <div className="border-t border-gray-200 p-4">
           <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs font-semibold text-gray-500 mb-1">Logged in as</p>
+            <p className="text-xs font-semibold text-gray-500 mb-1">Iniciaste sesión como</p>
             <p className="text-sm font-semibold text-gray-900 truncate">
               {user?.name || user?.email?.split('@')[0] || 'User'}
             </p>
             <p className="text-xs text-gray-500 capitalize truncate">
-              {userRole || 'user'}
+              {getRoleDisplayLabel(userRole)}
             </p>
           </div>
         </div>

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
+import Icon from '../components/Icon';
 import { apiService } from '../services/api';
 
 const INITIAL_PROJECT_FORM = {
@@ -1072,7 +1074,7 @@ export default function ProjectsPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
-              ⚠️
+              <Icon icon={faTriangleExclamation} size={20} color="currentColor" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar proyecto?</h3>
             <p className="text-gray-500 mb-6 leading-relaxed">

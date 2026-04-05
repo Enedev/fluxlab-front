@@ -6,8 +6,18 @@
  */
 
 import { useState, useEffect } from 'react';
+import {
+  faCheck,
+  faFileLines,
+  faFolderOpen,
+  faPenToSquare,
+  faTriangleExclamation,
+  faTrashCan,
+  faXmark
+} from '@fortawesome/free-solid-svg-icons';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import Icon from './Icon';
 
 export default function SamplesTable() {
   const { user } = useAuth();
@@ -40,6 +50,7 @@ export default function SamplesTable() {
     status: 'pending',
     fieldValues: {}
   });
+  const [quickAddErrorRowKey, setQuickAddErrorRowKey] = useState(null);
 
   // Dedicated Create Form State (for the Modal)
   const [createFormData, setCreateFormData] = useState({
@@ -182,8 +193,20 @@ export default function SamplesTable() {
   };
 
   const handleQuickAdd = async (templateId, projectId) => {
+    const currentQuickAddRowKey = `${projectId}-${templateId}`;
+
+    const triggerQuickAddErrorFlash = () => {
+      setQuickAddErrorRowKey(currentQuickAddRowKey);
+      window.setTimeout(() => {
+        setQuickAddErrorRowKey((currentKey) => (
+          currentKey === currentQuickAddRowKey ? null : currentKey
+        ));
+      }, 700);
+    };
+
     if (!quickAddRow.code || quickAddRow.code.trim() === '') {
       setError('El código es requerido para la creación rápida');
+      triggerQuickAddErrorFlash();
       return;
     }
 
@@ -209,8 +232,10 @@ export default function SamplesTable() {
       await apiService.samples.createWithValues(payload);
       await loadData();
       setQuickAddRow({ templateId: null, projectId: null, code: '', status: 'pending', fieldValues: {} });
+      setQuickAddErrorRowKey(null);
     } catch (err) {
       setError(err.message || 'Error en creación rápida');
+      triggerQuickAddErrorFlash();
     } finally {
       setIsSubmitting(false);
     }
@@ -359,7 +384,9 @@ export default function SamplesTable() {
               {/* Project Bar */}
               <div className="bg-slate-900 text-white px-6 py-3 rounded-lg flex items-center justify-between shadow-md">
                 <div className="flex items-center gap-3">
-                  <div className="bg-teal-500 p-1.5 rounded-md text-white">📂</div>
+                  <div className="bg-teal-500 p-1.5 rounded-md text-white">
+                    <Icon icon={faFolderOpen} size={14} color="currentColor" />
+                  </div>
                   <h2 className="text-lg font-bold">Proyecto: {project.name}</h2>
                 </div>
                 <div className="bg-emerald-950/40 text-emerald-400 px-3 py-1 rounded border border-emerald-500/20 text-[10px] font-mono uppercase tracking-widest">
@@ -374,7 +401,9 @@ export default function SamplesTable() {
                     {/* Template Header */}
                     <div className="bg-gray-50/50 px-6 py-3 border-b border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="text-slate-400">📄</span>
+                        <span className="text-slate-400">
+                          <Icon icon={faFileLines} size={14} color="currentColor" />
+                        </span>
                         <h3 className="text-slate-700 font-bold">Plantilla: {template.name}</h3>
                       </div>
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -494,7 +523,7 @@ export default function SamplesTable() {
                                         title="Guardar"
                                         disabled={isSubmitting}
                                       >
-                                        {isSubmitting ? "..." : "✔️"}
+                                        {isSubmitting ? "..." : <Icon icon={faCheck} size={16} color="currentColor" />}
                                       </button>
                                       <button 
                                         onClick={cancelEditing}
@@ -502,13 +531,17 @@ export default function SamplesTable() {
                                         title="Cancelar"
                                         disabled={isSubmitting}
                                       >
-                                        ❌
+                                        <Icon icon={faXmark} size={16} color="currentColor" />
                                       </button>
                                     </div>
                                   ) : (
                                     <div className="flex items-center justify-end gap-3 opacity-30 hover:opacity-100 transition">
-                                      <button onClick={() => startEditing(sample)} className="hover:scale-120 hover:grayscale-0 transition grayscale" title="Editar">✏️</button>
-                                      <button onClick={() => handleDelete(sample.id)} className="hover:scale-120 hover:grayscale-0 transition grayscale" title="Eliminar">🗑</button>
+                                      <button onClick={() => startEditing(sample)} className="hover:scale-120 hover:grayscale-0 transition grayscale" title="Editar">
+                                        <Icon icon={faPenToSquare} size={14} color="currentColor" />
+                                      </button>
+                                      <button onClick={() => handleDelete(sample.id)} className="hover:scale-120 hover:grayscale-0 transition grayscale" title="Eliminar">
+                                        <Icon icon={faTrashCan} size={14} color="currentColor" />
+                                      </button>
                                     </div>
                                   )}
                                 </td>
@@ -517,12 +550,22 @@ export default function SamplesTable() {
                           })}
 
                           {/* QUICK ADD ROW */}
-                          <tr className="bg-slate-50/20 group">
+                          <tr
+                            className={`group transition-colors duration-200 ${
+                              quickAddErrorRowKey === `${project.id}-${template.id}`
+                                ? 'bg-red-100/80 animate-pulse'
+                                : 'bg-slate-50/20'
+                            }`}
+                          >
                             <td className="px-6 py-3">
                               <input
                                 type="text"
                                 placeholder="AGREGAR MUESTRA"
-                                className="w-full bg-white border border-teal-200 rounded px-2 py-1 text-xs font-bold text-slate-900 placeholder-slate-300 focus:ring-1 focus:ring-teal-500 focus:border-teal-300"
+                                className={`w-full bg-white border rounded px-2 py-1 text-xs font-bold text-slate-900 placeholder-slate-300 focus:ring-1 ${
+                                  quickAddErrorRowKey === `${project.id}-${template.id}`
+                                    ? 'border-red-300 focus:ring-red-500 focus:border-red-400'
+                                    : 'border-teal-200 focus:ring-teal-500 focus:border-teal-300'
+                                }`}
                                 value={quickAddRow.templateId === template.id && quickAddRow.projectId === project.id ? quickAddRow.code : ""}
                                 onChange={(e) => setQuickAddRow({ ...quickAddRow, templateId: template.id, projectId: project.id, code: e.target.value })}
                                 onKeyDown={(e) => { if (e.key === "Enter") handleQuickAdd(template.id, project.id); }}
@@ -562,7 +605,16 @@ export default function SamplesTable() {
                               </td>
                             ))}
                             <td className="px-6 py-3 text-right">
-                              <button onClick={() => handleQuickAdd(template.id, project.id)} className="text-slate-300 hover:text-teal-500 font-bold text-lg">{isSubmitting ? "..." : "+"}</button>
+                              <button
+                                onClick={() => handleQuickAdd(template.id, project.id)}
+                                className={`font-bold text-lg transition-colors ${
+                                  quickAddErrorRowKey === `${project.id}-${template.id}`
+                                    ? 'text-red-500 hover:text-red-600'
+                                    : 'text-slate-300 hover:text-teal-500'
+                                }`}
+                              >
+                                {isSubmitting ? "..." : "+"}
+                              </button>
                             </td>
                           </tr>
                         </tbody>
@@ -583,7 +635,6 @@ export default function SamplesTable() {
             {/* Modal Header */}
             <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">??</span>
                 <h3 className="text-lg font-bold">Crear Muestra</h3>
               </div>
               <button 
@@ -689,7 +740,9 @@ export default function SamplesTable() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 overflow-hidden">
             <div className="mb-4 text-center">
-              <div className="bg-red-50 text-red-500 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">???</div>
+              <div className="bg-red-50 text-red-500 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+                <Icon icon={faTriangleExclamation} size={18} color="currentColor" />
+              </div>
               <h3 className="text-lg font-bold text-gray-900">¿Eliminar Muestra?</h3>
               <p className="text-gray-500 text-sm">Esta acción es irreversible y eliminará todos los datos asociados.</p>
             </div>

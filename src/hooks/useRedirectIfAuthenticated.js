@@ -15,7 +15,8 @@ export function useRedirectIfAuthenticated() {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate('/dashboard');
+      // navigate('/dashboard');
+      navigate('/projects');
     }
   }, [isAuthenticated, navigate]);
 }

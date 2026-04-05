@@ -6,9 +6,17 @@
  */
 
 import { useState, useEffect } from 'react';
+import {
+  faClipboardList,
+  faFileLines,
+  faPenToSquare,
+  faTrashCan,
+  faTriangleExclamation
+} from '@fortawesome/free-solid-svg-icons';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import TemplateBuilder from './TemplateBuilder';
+import Icon from './Icon';
 
 export default function TemplatesTable() {
   const { user } = useAuth();
@@ -110,7 +118,10 @@ export default function TemplatesTable() {
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 font-medium">
-          ⚠️ {error}
+          <span className="inline-flex items-center gap-2">
+            <Icon icon={faTriangleExclamation} size={14} color="currentColor" />
+            {error}
+          </span>
         </div>
       )}
 
@@ -134,7 +145,7 @@ export default function TemplatesTable() {
         {templates.length === 0 ? (
           <div className="col-span-full bg-white rounded-2xl border-2 border-dashed border-gray-100 p-12 text-center">
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl text-gray-300">
-              📋
+              <Icon icon={faClipboardList} size={24} color="currentColor" />
             </div>
             <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No hay plantillas creadas</p>
           </div>
@@ -146,7 +157,7 @@ export default function TemplatesTable() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-xl">
-                  📄
+                  <Icon icon={faFileLines} size={18} color="#059669" />
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                   <button
@@ -154,14 +165,14 @@ export default function TemplatesTable() {
                     className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg"
                     title="Editar"
                   >
-                    ✏️
+                    <Icon icon={faPenToSquare} size={14} color="currentColor" />
                   </button>
                   <button
                     onClick={() => handleDelete(template.id)}
                     className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg"
                     title="Eliminar"
                   >
-                    🗑
+                    <Icon icon={faTrashCan} size={14} color="currentColor" />
                   </button>
                 </div>
               </div>
@@ -189,7 +200,7 @@ export default function TemplatesTable() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
-              ⚠️
+              <Icon icon={faTriangleExclamation} size={20} color="currentColor" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar plantilla?</h3>
             <p className="text-gray-500 mb-6 leading-relaxed">

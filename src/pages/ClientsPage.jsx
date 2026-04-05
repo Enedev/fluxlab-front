@@ -5,7 +5,14 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  faEllipsisVertical,
+  faTriangleExclamation,
+  faUsers,
+  faXmark
+} from '@fortawesome/free-solid-svg-icons';
 import Navbar from '../components/Navbar';
+import Icon from '../components/Icon';
 import Sidebar from '../components/Sidebar';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -491,7 +498,7 @@ export default function ClientsPage() {
               }}
               title="Acciones del cliente"
             >
-              ⋮
+              <Icon icon={faEllipsisVertical} size={14} color="currentColor" />
             </button>
 
             {actionMenuClientId === client.id && (
@@ -542,7 +549,7 @@ export default function ClientsPage() {
                   onClick={() => setShowCreateModal(true)}
                   className="inline-flex items-center justify-center gap-2 !bg-emerald-500 hover:!bg-emerald-600 !text-gray-900 font-semibold !px-5 !py-3 rounded-lg transition"
                 >
-                  <span>👥</span>
+                  <Icon icon={faUsers} size={14} color="currentColor" />
                   Registrar nuevo cliente
                 </button>
               )}
@@ -600,7 +607,7 @@ export default function ClientsPage() {
                       placeholder="Buscar por nombre, correo, telefono o ID"
                       className="w-full sm:w-80 px-10 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">ICONO_BUSCAR</span>
                   </div>
                   */}
 
@@ -727,7 +734,7 @@ export default function ClientsPage() {
                 onClick={() => setShowCreateModal(false)}
                 className="inline-flex items-center justify-center !p-0 w-8 h-8 rounded-lg text-lg leading-none text-gray-600 hover:bg-gray-100"
               >
-                ✕
+                <Icon icon={faXmark} size={16} color="currentColor" />
               </button>
             </div>
 
@@ -840,7 +847,7 @@ export default function ClientsPage() {
                 }}
                 className="inline-flex items-center justify-center !p-0 w-8 h-8 rounded-lg text-lg leading-none text-gray-600 hover:bg-gray-100"
               >
-                ✕
+                <Icon icon={faXmark} size={16} color="currentColor" />
               </button>
             </div>
 
@@ -941,7 +948,7 @@ export default function ClientsPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
-              ⚠️
+              <Icon icon={faTriangleExclamation} size={20} color="currentColor" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar cliente?</h3>
             <p className="text-gray-500 mb-6 leading-relaxed">

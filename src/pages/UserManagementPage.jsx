@@ -6,7 +6,19 @@
  */
 
 import { useState, useEffect } from 'react';
+import {
+  faCheck,
+  faClipboard,
+  faFloppyDisk,
+  faLock,
+  faPenToSquare,
+  faSpinner,
+  faTrashCan,
+  faTriangleExclamation,
+  faXmark
+} from '@fortawesome/free-solid-svg-icons';
 import Navbar from '../components/Navbar';
+import Icon from '../components/Icon';
 import Sidebar from '../components/Sidebar';
 import Button from '../components/Button';
 import { createUser, getAllUsers, deleteUser, updateUser } from '../services/userService';
@@ -289,7 +301,17 @@ export default function UserManagementPage() {
                       disabled={loading}
                       className="w-full"
                     >
-                      {loading ? '⏳ Creando...' : '🔒 Completar Registro'}
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Icon icon={faSpinner} spin size={14} color="currentColor" />
+                          Creando...
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <Icon icon={faLock} size={14} color="currentColor" />
+                          Completar Registro
+                        </span>
+                      )}
                     </button>
                   </form>
 
@@ -314,7 +336,8 @@ export default function UserManagementPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="mb-4 flex gap-4 border-b border-gray-200">
+                {/* descomentar esto */}
+                {/* <div className="mb-4 flex gap-4 border-b border-gray-200">
                   <button
                     onClick={() => setFilterRole('all')}
                     className={`px-4 py-2 border-b-2 font-medium text-sm transition ${
@@ -345,7 +368,7 @@ export default function UserManagementPage() {
                   >
                     Investigadores
                   </button>
-                </div>
+                </div> */}
 
                 {/* Users List Table */}
                 <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
@@ -396,14 +419,20 @@ export default function UserManagementPage() {
                                     disabled={loading}
                                     className="text-xs px-2 py-1 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded disabled:bg-gray-200 disabled:text-gray-400 transition"
                                   >
-                                    ✏️ Editar
+                                    <span className="inline-flex items-center gap-1">
+                                      <Icon icon={faPenToSquare} size={12} color="currentColor" />
+                                      Editar
+                                    </span>
                                   </button>
                                   <button
                                     onClick={() => handleDeleteUser(user.id)}
                                     disabled={loading}
                                     className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded disabled:bg-gray-200 disabled:text-gray-400 transition"
                                   >
-                                    🗑️ Eliminar
+                                    <span className="inline-flex items-center gap-1">
+                                      <Icon icon={faTrashCan} size={12} color="currentColor" />
+                                      Eliminar
+                                    </span>
                                   </button>
                                 </div>
                               </td>
@@ -420,11 +449,12 @@ export default function UserManagementPage() {
                       <div className="text-sm text-gray-600">
                         MOSTRANDO {getFilteredUsers().length} DE {users.length} USUARIOS
                       </div>
-                      <div className="flex gap-2">
+                      {/* descomentar esto */}
+                      {/* <div className="flex gap-2">
                         <button className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">1</button>
                         <button className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">2</button>
                         <button className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">3</button>
-                      </div>
+                      </div> */}
                     </div>
                   )}
                 </div>
@@ -461,7 +491,10 @@ export default function UserManagementPage() {
                     onClick={() => copyToClipboard(newUserEmail)}
                     className=""
                   >
-                    📋 Copiar
+                    <span className="inline-flex items-center gap-1">
+                      <Icon icon={faClipboard} size={14} color="currentColor" />
+                      Copiar
+                    </span>
                   </button>
                 </div>
               </div>
@@ -480,7 +513,10 @@ export default function UserManagementPage() {
                     onClick={() => copyToClipboard(newUserPassword)}
                     className=""
                   >
-                    📋 Copiar
+                    <span className="inline-flex items-center gap-1">
+                      <Icon icon={faClipboard} size={14} color="currentColor" />
+                      Copiar
+                    </span>
                   </button>
                 </div>
               </div>
@@ -488,7 +524,11 @@ export default function UserManagementPage() {
               {/* Important Notice */}
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <p className="text-sm text-red-800">
-                  <strong>⚠️ Importante:</strong> El usuario deberá cambiar esta contraseña temporal después de iniciar sesión por primera vez.
+                  <strong className="inline-flex items-center gap-1">
+                    <Icon icon={faTriangleExclamation} size={12} color="currentColor" />
+                    Importante:
+                  </strong>{' '}
+                  El usuario deberá cambiar esta contraseña temporal después de iniciar sesión por primera vez.
                 </p>
               </div>
             </div>
@@ -498,7 +538,10 @@ export default function UserManagementPage() {
               onClick={() => setShowPasswordModal(false)}
               className="w-full"
             >
-              ✅ Entendido
+              <span className="inline-flex items-center gap-2">
+                <Icon icon={faCheck} size={14} color="currentColor" />
+                Entendido
+              </span>
             </button>
           </div>
         </div>
@@ -545,13 +588,26 @@ export default function UserManagementPage() {
                   }}
                   className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
-                  ✕ Cancelar
+                  <span className="inline-flex items-center gap-1">
+                    <Icon icon={faXmark} size={12} color="currentColor" />
+                    Cancelar
+                  </span>
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
                 >
-                  {loading ? '⏳ Guardando...' : '💾 Guardar Cambios'}
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Icon icon={faSpinner} spin size={14} color="currentColor" />
+                      Guardando...
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2">
+                      <Icon icon={faFloppyDisk} size={14} color="currentColor" />
+                      Guardar Cambios
+                    </span>
+                  )}
                 </button>
               </div>
             </form>

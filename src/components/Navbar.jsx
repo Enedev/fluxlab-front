@@ -9,11 +9,24 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
+import Icon from './Icon';
 
 export function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const getRoleDisplayLabel = (role) => {
+    switch (role) {
+      case 'technician':
+        return 'Técnico';
+      case 'researcher':
+        return 'Investigador';
+      default:
+        return role || 'User';
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -43,23 +56,23 @@ export function Navbar() {
       <div className="flex items-center justify-between px-6 py-4 h-16">
         {/* Center - Search Bar (Extended) */}
         <div className="flex-1 flex items-center">
-          <div className="relative w-full max-w-2xl">
+          {/* <div className="relative w-full max-w-2xl">
             <input
               type="text"
               placeholder="Buscar muestras, proyectos o datos..."
               className="w-full px-4 py-2 pl-10 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
             />
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-              🔍
+              ICONO_BUSCAR
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Right - User Menu */}
         <div className="flex items-center gap-4">
           {/* Notification Bell (Placeholder) - commented for now
           <button className="relative p-2 text-gray-600 hover:text-gray-900 transition hover:bg-gray-100 rounded-lg">
-            🔔
+            ICONO_NOTIFICACION
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
           */}
@@ -81,7 +94,7 @@ export function Navbar() {
                   {user?.name || user?.email?.split('@')[0] || 'User'}
                 </p>
                 <p className="text-xs text-gray-500 capitalize">
-                  {user?.app_metadata?.role || 'User'}
+                  {getRoleDisplayLabel(user?.app_metadata?.role || user?.role)}
                 </p>
               </div>
 
@@ -105,19 +118,19 @@ export function Navbar() {
                   href="#profile"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
                 >
-                  👤 Profile
+                  Profile
                 </a>
                 <a
                   href="#settings"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
                 >
-                  ⚙️ Settings
+                  Settings
                 </a>
                 <a
                   href="#help"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
                 >
-                  ❓ Help & Support
+                  Help & Support
                 </a>
                 */}
 
@@ -129,7 +142,10 @@ export function Navbar() {
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition font-medium"
                 >
-                  🚪 Sign Out
+                  <span className="inline-flex items-center gap-2">
+                    <Icon icon={faRightFromBracket} size={14} color="currentColor" />
+                    Cerrar sesión
+                  </span>
                 </button>
               </div>
             )}

@@ -6,7 +6,13 @@
  */
 
 import { useState } from 'react';
+import {
+  faClipboardList,
+  faTrashCan,
+  faTriangleExclamation
+} from '@fortawesome/free-solid-svg-icons';
 import { apiService } from '../services/api';
+import Icon from './Icon';
 
 export default function TemplateBuilder({ onSave, onCancel, template = null }) {
   const [formData, setFormData] = useState({
@@ -110,7 +116,9 @@ export default function TemplateBuilder({ onSave, onCancel, template = null }) {
       {/* Template Details Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 space-y-6">
         <div className="flex items-center gap-3 text-green-600 font-bold border-b border-gray-50 pb-4">
-          <span className="text-xl">📋</span>
+          <span className="text-xl">
+            <Icon icon={faClipboardList} size={18} color="currentColor" />
+          </span>
           <span className="uppercase tracking-wide text-sm">Detalles de la Plantilla</span>
         </div>
 
@@ -204,7 +212,7 @@ export default function TemplateBuilder({ onSave, onCancel, template = null }) {
                 onClick={() => handleRemoveField(field.id)}
                 className="text-gray-300 hover:text-red-500 transition-colors flex justify-center p-2"
               >
-                🗑
+                <Icon icon={faTrashCan} size={14} color="currentColor" />
               </button>
             </div>
           ))}
@@ -228,7 +236,10 @@ export default function TemplateBuilder({ onSave, onCancel, template = null }) {
       <div className="flex flex-col gap-4">
         {error && (
           <div className="p-4 bg-red-50 text-red-700 text-sm font-bold rounded-xl border border-red-100 animate-in slide-in-from-top-2">
-            ⚠️ {error}
+            <span className="inline-flex items-center gap-2">
+              <Icon icon={faTriangleExclamation} size={14} color="currentColor" />
+              {error}
+            </span>
           </div>
         )}
         

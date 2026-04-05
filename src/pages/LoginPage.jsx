@@ -7,9 +7,19 @@
 
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import {
+  faClipboard,
+  faEnvelope,
+  faEye,
+  faEyeSlash,
+  faLightbulb,
+  faLock,
+  faSpinner
+} from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import Button from '../components/Button';
+import Icon from '../components/Icon';
 import logo from '../assets/logoConFondo.jpeg';
 
 export default function LoginPage() {
@@ -82,7 +92,7 @@ export default function LoginPage() {
         return;
       }
 
-      navigate('/dashboard');
+      navigate('/projects');
     } catch (err) {
       setError(err.message || 'An unexpected error occurred');
     } finally {
@@ -205,7 +215,7 @@ export default function LoginPage() {
               {/* Email */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <span>✉️</span>
+                  <Icon icon={faEnvelope} size={14} color="currentColor" />
                   Correo Electrónico
                 </label>
                 <input
@@ -221,7 +231,7 @@ export default function LoginPage() {
               {/* Password */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <span>🔒</span>
+                  <Icon icon={faLock} size={14} color="currentColor" />
                   Contraseña
                 </label>
                 <div className="relative">
@@ -239,7 +249,11 @@ export default function LoginPage() {
                     disabled={isSubmitting}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? (
+                      <Icon icon={faEyeSlash} size={14} color="currentColor" />
+                    ) : (
+                      <Icon icon={faEye} size={14} color="currentColor" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -259,7 +273,7 @@ export default function LoginPage() {
               >
                 {isSubmitting ? (
                   <>
-                    <span className="inline-block animate-spin mr-2">⏳</span>
+                    <Icon icon={faSpinner} spin className="mr-2" size={14} color="currentColor" />
                     INICIANDO SESIÓN...
                   </>
                 ) : (
@@ -273,15 +287,21 @@ export default function LoginPage() {
               ¿No tienes una cuenta?{' '}
               <span className="text-gray-700 font-semibold">Contacta con tu administrador</span>
             </p>
-
+{/* descomentar */}
             {/* Back Link */}
             <div className="text-center mt-6">
-              <Link
+              {/* <Link
                 to="/"
                 className="text-sm text-gray-400 hover:text-gray-600 transition inline-flex items-center gap-1"
               >
                 ← Volver a la página de bienvenida
-              </Link>
+              </Link> */}
+              <span
+                
+                className="text-sm text-gray-400 hover:text-gray-600 transition inline-flex items-center gap-1"
+              >
+                ¡Software LIMS adaptado para ti!
+              </span>
             </div>
           </div>
         </div>
@@ -322,7 +342,10 @@ export default function LoginPage() {
                   }}
                   className=""
                 >
-                  📋 Copiar
+                  <span className="inline-flex items-center gap-1">
+                    <Icon icon={faClipboard} size={14} color="currentColor" />
+                    Copiar
+                  </span>
                 </button>
               </div>
             </div>
@@ -349,7 +372,11 @@ export default function LoginPage() {
                     disabled={isChangingPassword}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
                   >
-                    {showNewPassword ? '🙈' : '👁️'}
+                    {showNewPassword ? (
+                      <Icon icon={faEyeSlash} size={14} color="currentColor" />
+                    ) : (
+                      <Icon icon={faEye} size={14} color="currentColor" />
+                    )}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
@@ -373,7 +400,11 @@ export default function LoginPage() {
               {/* Info Box */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-xs text-blue-800">
-                  <strong>💡 Consejo:</strong> Usa una contraseña fuerte con letras mayúsculas, minúsculas, números y caracteres especiales.
+                  <strong className="inline-flex items-center gap-1">
+                    <Icon icon={faLightbulb} size={12} color="currentColor" />
+                    Consejo:
+                  </strong>{' '}
+                  Usa una contraseña fuerte con letras mayúsculas, minúsculas, números y caracteres especiales.
                 </p>
               </div>
 
@@ -384,11 +415,14 @@ export default function LoginPage() {
               >
                 {isChangingPassword ? (
                   <>
-                    <span className="inline-block animate-spin mr-2">⏳</span>
+                    <Icon icon={faSpinner} spin className="mr-2" size={14} color="currentColor" />
                     Cambiando...
                   </>
                 ) : (
-                  <>🔒 Cambiar Contraseña</>
+                  <span className="inline-flex items-center gap-2">
+                    <Icon icon={faLock} size={14} color="currentColor" />
+                    Cambiar Contraseña
+                  </span>
                 )}
               </button>
             </form>
