@@ -175,7 +175,7 @@ export default function TemplatesTable() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                   {template.fields?.length || 0} Campos
                 </span>
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-lg uppercase tracking-widest">
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-lg uppercase tracking-widest">
                   Ver Detalles
                 </span>
               </div>
