@@ -12,6 +12,42 @@ import { supabase } from '../config/supabase';
 // Create the auth context
 const AuthContext = createContext(null);
 
+function readJsonStorageValue(key) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const value = window.localStorage.getItem(key);
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function getCypressAuthBootstrap() {
+  if (typeof window === 'undefined' || !window.Cypress) {
+    return null;
+  }
+
+  const storedUser = readJsonStorageValue('cypress-auth-user');
+  const storedSession = readJsonStorageValue('cypress-auth-session');
+
+  if (!storedUser || !storedSession) {
+    return null;
+  }
+
+  return {
+    user: storedUser,
+    session: storedSession
+  };
+}
+
 /**
  * Auth Provider Component
  * Wrap your App with this to enable authentication throughout the app
@@ -24,6 +60,15 @@ export function AuthProvider({ children }) {
 
   // Initialize auth state and listen for changes
   useEffect(() => {
+    const cypressAuth = getCypressAuthBootstrap();
+
+    if (cypressAuth) {
+      setUser(cypressAuth.user);
+      setSession(cypressAuth.session);
+      setLoading(false);
+      return;
+    }
+
     // Initialize auth state
     const initializeAuth = async () => {
       try {
@@ -61,6 +106,12 @@ export function AuthProvider({ children }) {
     };
 
     initializeAuth();
+
+    const isCypressRuntime = typeof window !== 'undefined' && Boolean(window.Cypress);
+
+    if (isCypressRuntime) {
+      return;
+    }
 
     // Listen for auth state changes
     if (supabase) {
@@ -139,6 +190,11 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setError(null);
     try {
+      if (typeof window !== 'undefined' && window.Cypress) {
+        window.localStorage.removeItem('cypress-auth-user');
+        window.localStorage.removeItem('cypress-auth-session');
+      }
+
       // Clear context state immediately
       setSession(null);
       setUser(null);
