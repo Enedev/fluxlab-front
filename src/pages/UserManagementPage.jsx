@@ -38,6 +38,8 @@ export default function UserManagementPage() {
   const [filterRole, setFilterRole] = useState('all'); // 'all', 'technician', 'researcher'
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
   const [editFormData, setEditFormData] = useState({
     name: '',
     email: '',
@@ -110,16 +112,24 @@ export default function UserManagementPage() {
     }
   }
 
-  // Handle delete user
-  async function handleDeleteUser(userId) {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
+  // Open delete modal
+  function handleOpenDeleteModal(user) {
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  }
+
+  // Confirm delete user
+  async function handleDeleteUser() {
+    if (!userToDelete?.id) {
       return;
     }
 
     try {
       setLoading(true);
-      await deleteUser(userId);
+      await deleteUser(userToDelete.id);
       await loadUsers();
+      setShowDeleteModal(false);
+      setUserToDelete(null);
     } catch (err) {
       setError(`Error al eliminar usuario: ${err.message}`);
       console.error(err);
@@ -378,7 +388,7 @@ export default function UserManagementPage() {
                         <tr>
                           <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">MIEMBRO DEL PERSONAL</th>
                           <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ROL</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ÚLTIMO INGRESO</th>
+                          {/* <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ÚLTIMO INGRESO</th> */}
                           <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ESTADO</th>
                           <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ACCIONES</th>
                         </tr>
@@ -400,9 +410,9 @@ export default function UserManagementPage() {
                               <td className="px-6 py-4 text-sm text-gray-600">
                                 {ROLES.find(r => r.id === user.role)?.label || user.role}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">
+                              {/* <td className="px-6 py-4 text-sm text-gray-600">
                                 {formatLastSignIn(user.last_sign_in_at)}
-                              </td>
+                              </td> */}
                               <td className="px-6 py-4 text-sm">
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                                   user.passwordChanged
@@ -425,7 +435,7 @@ export default function UserManagementPage() {
                                     </span>
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteUser(user.id)}
+                                    onClick={() => handleOpenDeleteModal(user)}
                                     disabled={loading}
                                     className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded disabled:bg-gray-200 disabled:text-gray-400 transition"
                                   >
@@ -543,6 +553,39 @@ export default function UserManagementPage() {
                 Entendido
               </span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Modal */}
+      {showDeleteModal && userToDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 text-xl">
+              <Icon icon={faTriangleExclamation} size={20} color="currentColor" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">¿Eliminar usuario?</h3>
+            <p className="text-gray-500 mb-6 leading-relaxed">
+              Esta acción no se puede deshacer. El usuario {userToDelete.name} será eliminado definitivamente.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleDeleteUser}
+                disabled={loading}
+                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white px-4 py-3 rounded-xl font-bold transition-all"
+              >
+                {loading ? 'Eliminando...' : 'Sí, eliminar definitivamente'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setUserToDelete(null);
+                }}
+                className="w-full text-gray-500 px-4 py-3 font-bold hover:bg-gray-50 rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
