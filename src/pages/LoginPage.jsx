@@ -8,13 +8,15 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import {
+  faCheck,
   faClipboard,
   faEnvelope,
   faEye,
   faEyeSlash,
   faLightbulb,
   faLock,
-  faSpinner
+  faSpinner,
+  faXmark
 } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
@@ -38,6 +40,48 @@ export default function LoginPage() {
   const [passwordError, setPasswordError] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+
+  const passwordValidations = {
+    minLength: newPassword.length >= 8,
+    hasNumber: /\d/.test(newPassword),
+    hasSpecialChar: /[^A-Za-z0-9]/.test(newPassword),
+    hasUpperAndLower: /[a-z]/.test(newPassword) && /[A-Z]/.test(newPassword),
+  };
+
+  const passwordValidationItems = [
+    {
+      key: 'minLength',
+      label: 'La contraseña debe tener mínimo 8 caracteres',
+      isValid: passwordValidations.minLength,
+      errorMessage: 'La contraseña debe tener al menos 8 caracteres.',
+    },
+    {
+      key: 'hasNumber',
+      label: 'La contraseña debe contener al menos 1 número',
+      isValid: passwordValidations.hasNumber,
+      errorMessage: 'La contraseña debe contener al menos 1 número.',
+    },
+    {
+      key: 'hasSpecialChar',
+      label: 'La contraseña debe contener al menos 1 carácter especial',
+      isValid: passwordValidations.hasSpecialChar,
+      errorMessage: 'La contraseña debe contener al menos 1 carácter especial.',
+    },
+    {
+      key: 'hasUpperAndLower',
+      label: 'La contraseña debe contener al menos 1 letra mayúscula y 1 letra minúscula',
+      isValid: passwordValidations.hasUpperAndLower,
+      errorMessage: 'La contraseña debe contener al menos 1 letra mayúscula y 1 letra minúscula.',
+    },
+  ];
+
+  const isPasswordComplex = passwordValidationItems.every((validation) => validation.isValid);
+  const passwordsMatch = newPassword !== '' && confirmPassword !== '' && newPassword === confirmPassword;
+  const completedComplexityRules = passwordValidationItems.filter((validation) => validation.isValid).length;
+  const totalPasswordProgressSteps = passwordValidationItems.length + 1;
+  const completedPasswordProgressSteps = completedComplexityRules + (passwordsMatch ? 1 : 0);
+  const passwordProgressPercent = (completedPasswordProgressSteps / totalPasswordProgressSteps) * 100;
+  const isReadyForPasswordUpdate = isPasswordComplex && passwordsMatch;
 
   /**
    * Handle form submission - SIMPLE FLOW
@@ -116,13 +160,13 @@ export default function LoginPage() {
         return;
       }
 
-      if (newPassword.length < 8) {
-        setPasswordError('La contraseña debe tener al menos 8 caracteres.');
+      if (!isPasswordComplex) {
+        setPasswordError('La contraseña no cumple los criterios de complejidad.');
         setIsChangingPassword(false);
         return;
       }
 
-      if (newPassword !== confirmPassword) {
+      if (!passwordsMatch) {
         setPasswordError('Las contraseñas no coinciden.');
         setIsChangingPassword(false);
         return;
@@ -167,7 +211,7 @@ export default function LoginPage() {
         setPasswordError('');
 
         // Navigate
-        setTimeout(() => navigate('/dashboard'), 100);
+        setTimeout(() => navigate('/projects'), 100);
       }
     } catch (err) {
       setPasswordError(err.message || 'Error al cambiar la contraseña');
@@ -310,9 +354,10 @@ export default function LoginPage() {
       {/* Password Change Modal */}
       {showPasswordChangeModal && currentUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Cambiar Contraseña</h2>
-            <p className="text-gray-600 text-sm mb-6">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
+            <div className="p-8">
+            <h2 className="text-center text-2xl font-bold text-gray-900 mb-3">Cambiar Contraseña</h2>
+            <p className="text-center text-gray-600 text-sm mb-6">
               Por tu seguridad, debes cambiar tu contraseña temporal antes de continuar.
             </p>
             
@@ -324,7 +369,7 @@ export default function LoginPage() {
             )}
 
             {/* Email Display with Copy Button */}
-            <div className="mb-6 pb-6 border-b border-gray-200">
+            {/* <div className="mb-6 pb-6 border-b border-gray-200">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tu Correo Electrónico
               </label>
@@ -348,7 +393,7 @@ export default function LoginPage() {
                   </span>
                 </button>
               </div>
-            </div>
+            </div> */}
 
             {/* Form */}
             <form onSubmit={handlePasswordChange} className="space-y-4">
@@ -362,7 +407,12 @@ export default function LoginPage() {
                     type={showNewPassword ? 'text' : 'password'}
                     placeholder="••••••••••"
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (passwordError) {
+                        setPasswordError('');
+                      }
+                    }}
                     disabled={isChangingPassword}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
@@ -379,7 +429,26 @@ export default function LoginPage() {
                     )}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres</p>
+                <ul className="mt-3 space-y-2">
+                  {passwordValidationItems.map((validation) => (
+                    <li key={validation.key} className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${
+                          validation.isValid ? 'bg-emerald-500' : 'bg-red-500'
+                        }`}
+                      >
+                        <Icon
+                          icon={validation.isValid ? faCheck : faXmark}
+                          size={10}
+                          color="white"
+                        />
+                      </span>
+                      <span className={`text-xs ${validation.isValid ? 'text-emerald-700' : 'text-gray-600'}`}>
+                        {validation.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               {/* Confirm Password */}
@@ -391,14 +460,19 @@ export default function LoginPage() {
                   type="password"
                   placeholder="••••••••••"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (passwordError) {
+                      setPasswordError('');
+                    }
+                  }}
                   disabled={isChangingPassword}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
               {/* Info Box */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-xs text-blue-800">
                   <strong className="inline-flex items-center gap-1">
                     <Icon icon={faLightbulb} size={12} color="currentColor" />
@@ -406,12 +480,17 @@ export default function LoginPage() {
                   </strong>{' '}
                   Usa una contraseña fuerte con letras mayúsculas, minúsculas, números y caracteres especiales.
                 </p>
-              </div>
+              </div> */}
 
               {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isChangingPassword}
+                className={`w-full font-medium rounded-lg px-6 py-2 transition-all duration-200 flex items-center justify-center ${
+                  isReadyForPasswordUpdate
+                    ? 'bg-emerald-500! text-black! shadow-lg shadow-emerald-400/50 hover:bg-emerald-600! hover:text-white!'
+                    : 'bg-gray-100! text-gray-700! border border-gray-300 hover:bg-gray-200!'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isChangingPassword ? (
                   <>
@@ -426,6 +505,15 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
+            </div>
+
+            {/* Password Progress Bar */}
+            <div className="w-full h-2.5 bg-gray-200 overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-300 shadow-[0_0_10px_rgba(16,185,129,0.45)]"
+                style={{ width: `${passwordProgressPercent}%` }}
+              />
+            </div>
           </div>
         </div>
       )}
