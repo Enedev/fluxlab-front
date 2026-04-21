@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute, { PublicOnlyRoute } from './components/ProtectedRoute';
 import WelcomePage from './pages/WelcomePage';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -18,8 +18,22 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<WelcomePage />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/"
+            element={
+              <PublicOnlyRoute>
+                <WelcomePage />
+              </PublicOnlyRoute>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <LoginPage />
+              </PublicOnlyRoute>
+            }
+          />
           
           {/* Protected Routes */}
           <Route
