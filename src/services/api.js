@@ -23,6 +23,29 @@ function buildApiUrl(baseUrl, endpoint = '') {
   return `${normalizedBase}/${normalizedEndpoint}`;
 }
 
+async function parseResponseBody(response) {
+  if (response.status === 204) {
+    return null;
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  const responseText = await response.text();
+
+  if (!responseText) {
+    return null;
+  }
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(responseText);
+    } catch {
+      return null;
+    }
+  }
+
+  return responseText;
+}
+
 /**
  * Make authenticated API requests with JWT token
  */
@@ -46,20 +69,18 @@ async function apiRequest(endpoint, options = {}, baseUrl = API_URL) {
       headers
     });
 
-    // Handle empty responses (like 204 No Content or successful DELETE with no body)
-    if (response.status === 204 || response.headers.get('content-length') === '0') {
-      return null;
-    }
-
-    // Try to parse JSON only if there's content
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
+    const responseBody = await parseResponseBody(response);
 
     if (!response.ok) {
-      throw new Error(data?.message || `API error: ${response.status}`);
+      const message =
+        responseBody?.message ||
+        responseBody?.error ||
+        `API Error: ${response.status} ${response.statusText}`;
+
+      throw new Error(message);
     }
 
-    return data;
+    return responseBody;
   } catch (error) {
     console.error('API Request failed:', error);
     throw error;
@@ -126,6 +147,34 @@ export const apiService = {
       return apiRequest(endpoint, {}, CLIENTS_API_URL);
     },
 
+    async searchByName(name) {
+      const searchParams = new URLSearchParams();
+
+      if (name && String(name).trim()) {
+        searchParams.append('name', String(name).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query ? `/search?${query}` : '/search';
+
+      return apiRequest(endpoint, {}, CLIENTS_API_URL);
+    },
+
+    async filterByClient(clientId, projectStatus) {
+      const searchParams = new URLSearchParams();
+
+      if (projectStatus && String(projectStatus).trim()) {
+        searchParams.append('projectStatus', String(projectStatus).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query
+        ? `/${clientId}/filter?${query}`
+        : `/${clientId}/filter`;
+
+      return apiRequest(endpoint, {}, CLIENTS_API_URL);
+    },
+
     async getById(id) {
       return apiRequest(`/${id}`, {}, CLIENTS_API_URL);
     },
@@ -144,8 +193,10 @@ export const apiService = {
       }, CLIENTS_API_URL);
     },
 
-    async remove(id) {
-      return apiRequest(`/${id}`, {
+    async remove(id, confirm = true) {
+      const endpoint = `/${id}?confirm=${confirm ? 'true' : 'false'}`;
+
+      return apiRequest(endpoint, {
         method: 'DELETE'
       }, CLIENTS_API_URL);
     }
@@ -158,8 +209,19 @@ export const apiService = {
    * POST /api/projects
    */
   projects: {
-    async getAll() {
-      return apiRequest('/projects');
+    async getAll(params = {}) {
+      const searchParams = new URLSearchParams();
+
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          searchParams.append(key, String(value));
+        }
+      });
+
+      const query = searchParams.toString();
+      const endpoint = query ? `/projects?${query}` : '/projects';
+
+      return apiRequest(endpoint);
     },
 
     async getById(id) {
@@ -170,6 +232,92 @@ export const apiService = {
       return apiRequest('/projects', {
         method: 'POST',
         body: JSON.stringify(projectData)
+      });
+    },
+
+    async update(id, projectData) {
+      return apiRequest(`/projects/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(projectData)
+      });
+    },
+
+    async remove(id) {
+      return apiRequest(`/projects/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async associateClient(clientId, projectIds = []) {
+      return apiRequest('/projects/associate-client', {
+        method: 'POST',
+        body: JSON.stringify({ clientId, projectIds })
+      });
+    },
+
+    async searchByName(name, clientId) {
+      const searchParams = new URLSearchParams();
+
+      if (name && String(name).trim()) {
+        searchParams.append('name', String(name).trim());
+      }
+
+      if (clientId && String(clientId).trim()) {
+        searchParams.append('clientId', String(clientId).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query ? `/projects/search?${query}` : '/projects/search';
+
+      return apiRequest(endpoint);
+    },
+
+    async filterByStatus(status, clientId) {
+      const searchParams = new URLSearchParams();
+
+      if (status && String(status).trim()) {
+        searchParams.append('value', String(status).trim());
+      }
+
+      if (clientId && String(clientId).trim()) {
+        searchParams.append('clientId', String(clientId).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query ? `/projects/status?${query}` : '/projects/status';
+
+      return apiRequest(endpoint);
+    },
+
+    async getAvailableStatuses(clientId) {
+      const searchParams = new URLSearchParams();
+
+      if (clientId && String(clientId).trim()) {
+        searchParams.append('clientId', String(clientId).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query
+        ? `/projects/status/available?${query}`
+        : '/projects/status/available';
+
+      return apiRequest(endpoint);
+    },
+
+    async getByClient(clientId) {
+      return apiRequest(`/projects/client/${clientId}`);
+    },
+
+    async updateStatus(id, status, clientId) {
+      const payload = { status };
+
+      if (clientId && String(clientId).trim()) {
+        payload.clientId = String(clientId).trim();
+      }
+
+      return apiRequest(`/projects/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
       });
     }
   },
@@ -183,6 +331,10 @@ export const apiService = {
    * DELETE /api/samples/:id
    */
   samples: {
+    async getRepository() {
+      return apiRequest('/samples/repository');
+    },
+
     async getAll(projectId = null) {
       let endpoint = '/samples';
       if (projectId) {

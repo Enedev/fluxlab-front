@@ -5,11 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:e2e": "vite --strictPort --port 5174",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "cy:open": "HOME=$PWD/.cypress-home CYPRESS_CACHE_FOLDER=.cypress-cache cypress open",
+    "cy:run": "HOME=$PWD/.cypress-home CYPRESS_CACHE_FOLDER=.cypress-cache cypress run --browser electron",
+    "test:e2e": "HOME=$PWD/.cypress-home CYPRESS_CACHE_FOLDER=.cypress-cache start-server-and-test dev:e2e http://localhost:5174 cy:run"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.2.0",
+    "@fortawesome/free-regular-svg-icons": "^7.2.0",
+    "@fortawesome/free-solid-svg-icons": "^7.2.0",
+    "@fortawesome/react-fontawesome": "^3.3.0",
     "@supabase/supabase-js": "^2.101.1",
     "@tailwindcss/postcss": "^4.2.2",
     "react": "^19.2.0",
@@ -18,16 +29,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.27",
+    "cypress": "^15.13.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^29.0.1",
     "postcss": "^8.5.8",
+    "start-server-and-test": "^3.0.0",
     "tailwindcss": "^4.2.2",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.2"
   }
 }

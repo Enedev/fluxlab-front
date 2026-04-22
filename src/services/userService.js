@@ -25,7 +25,24 @@ async function getAuthToken() {
   try {
     const { supabase } = await import('../config/supabase');
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token;
+
+    if (session?.access_token) {
+      return session.access_token;
+    }
+
+    if (typeof window !== 'undefined' && window.Cypress) {
+      try {
+        const rawSession = window.localStorage.getItem('cypress-auth-session');
+        if (rawSession) {
+          const parsedSession = JSON.parse(rawSession);
+          return parsedSession?.access_token || null;
+        }
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error('Error getting auth token:', error);
     return null;

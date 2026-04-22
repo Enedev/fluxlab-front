@@ -29,8 +29,8 @@ export default function SamplesPage() {
           <div className="p-6 md:p-8">
             {/* Header */}
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Muestras y Templates</h1>
-              <p className="text-gray-600">Gestiona las muestras de laboratorio y los templates de datos</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Muestras y Plantillas</h1>
+              <p className="text-gray-600">Gestiona las muestras de laboratorio y los plantillas de datos</p>
             </div>
 
             {/* Tab Navigation */}
@@ -39,26 +39,26 @@ export default function SamplesPage() {
                 onClick={() => setActiveTab('samples')}
                 className={`px-4 py-3 font-medium transition relative ${
                   activeTab === 'samples'
-                    ? 'text-blue-600'
+                    ? 'text-emerald-600'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Muestras
                 {activeTab === 'samples' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600"></div>
                 )}
               </button>
               <button
                 onClick={() => setActiveTab('templates')}
                 className={`px-4 py-3 font-medium transition relative ${
                   activeTab === 'templates'
-                    ? 'text-blue-600'
+                    ? 'text-emerald-600'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Templates
+                Plantillas
                 {activeTab === 'templates' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600"></div>
                 )}
               </button>
             </div>

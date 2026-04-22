@@ -24,3 +24,10 @@ dist-ssr
 *.sw?
 
 .env.local
+.env
+
+# Cypress
+cypress/videos
+cypress/screenshots
+.cypress-cache
+.cypress-home
