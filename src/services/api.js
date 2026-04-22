@@ -417,6 +417,19 @@ export const apiService = {
       return apiRequest('/templates');
     },
 
+    async searchByName(name) {
+      const searchParams = new URLSearchParams();
+
+      if (name && String(name).trim()) {
+        searchParams.append('name', String(name).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query ? `/templates/search/by-name?${query}` : '/templates/search/by-name';
+
+      return apiRequest(endpoint);
+    },
+
     async getById(id) {
       return apiRequest(`/templates/${id}`);
     },

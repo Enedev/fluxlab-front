@@ -871,13 +871,13 @@ export default function ProjectsPage() {
                   value={filters.name}
                   onChange={handleFilterChange}
                   placeholder="Buscar por nombre"
-                  className="p-2 border rounded-md"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                 />
                 <select
                   name="status"
                   value={filters.status}
                   onChange={handleFilterChange}
-                  className="p-2 border rounded-md"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                 >
                   <option value="">Todos los estados</option>
                   {availableStatuses.map((status) => (
@@ -894,7 +894,7 @@ export default function ProjectsPage() {
                     value={filters.fromDate}
                     onChange={handleFilterChange}
                     max={createEndDateBounds.min}
-                    className="p-2 border rounded-md"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                   />
                 </div>
                 <div className="flex flex-col">
@@ -905,7 +905,7 @@ export default function ProjectsPage() {
                     value={filters.toDate}
                     onChange={handleFilterChange}
                     max={createEndDateBounds.min}
-                    className="p-2 border rounded-md"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                   />
                 </div>
               </div>

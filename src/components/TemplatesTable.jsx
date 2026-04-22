@@ -5,7 +5,7 @@
  * Integrates with Supabase authentication and JWT tokens
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   faClipboardList,
   faFileLines,
@@ -23,22 +23,42 @@ export default function TemplatesTable() {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [templateSearch, setTemplateSearch] = useState('');
   const [showBuilder, setShowBuilder] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
+  const hasMountedRef = useRef(false);
 
   // Load templates on component mount
   useEffect(() => {
     loadTemplates();
   }, []);
 
-  const loadTemplates = async () => {
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      loadTemplates(templateSearch);
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [templateSearch]);
+
+  const loadTemplates = async (name = '') => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.templates.getAll();
-      setTemplates(data);
+
+      const trimmedName = String(name || '').trim();
+      const data = trimmedName
+        ? await apiService.templates.searchByName(trimmedName)
+        : await apiService.templates.getAll();
+
+      setTemplates(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error loading templates:', err);
       setError(err.message || 'Error al cargar los templates');
@@ -105,14 +125,6 @@ export default function TemplatesTable() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500 italic">Cargando templates...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Error Message */}
@@ -139,6 +151,32 @@ export default function TemplatesTable() {
           <span>Nueva Plantilla</span>
         </button>
       </div>
+
+      {/* Search */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={templateSearch}
+            onChange={(event) => setTemplateSearch(event.target.value)}
+            placeholder="Buscar por nombre"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+          />
+          <button
+            type="button"
+            onClick={() => setTemplateSearch('')}
+            className="px-4 py-3 rounded-xl font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-2">
+          <div className="text-gray-500 italic">Cargando templates...</div>
+        </div>
+      )}
 
       {/* Templates List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
