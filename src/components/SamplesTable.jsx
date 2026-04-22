@@ -5,11 +5,12 @@
  * Integrates with Inline Editing, Quick Add, and a traditional Creation Modal
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   faCheck,
   faFileLines,
   faFolderOpen,
+  faFloppyDisk,
   faPenToSquare,
   faTriangleExclamation,
   faTrashCan,
@@ -18,14 +19,23 @@ import {
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
+import * as XLSX from 'xlsx';
 
 export default function SamplesTable() {
   const { user } = useAuth();
+  const fileInputRefs = useRef({});
   const [samples, setSamples] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [importMessage, setImportMessage] = useState(null);
+  const [importingProjectId, setImportingProjectId] = useState(null);
+  const [showImportTemplateModal, setShowImportTemplateModal] = useState(false);
+  const [importDraft, setImportDraft] = useState(null);
+  const [importTemplateName, setImportTemplateName] = useState('');
+  const [importFieldSettings, setImportFieldSettings] = useState([]);
+  const [importModalError, setImportModalError] = useState(null);
   
   // Inline Editing State
   const [editingId, setEditingId] = useState(null);
@@ -59,6 +69,182 @@ export default function SamplesTable() {
     templateId: '',
     status: 'pending'
   });
+
+  const normalizeText = (value) => {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+  };
+
+  const normalizeFieldKey = (value) => normalizeText(value).replace(/\s+/g, '');
+
+  const isCsvFile = (fileName) => String(fileName || '').toLowerCase().endsWith('.csv');
+  const isXlsxFile = (fileName) => String(fileName || '').toLowerCase().endsWith('.xlsx');
+
+  const detectDelimiter = (text) => {
+    const previewLine = String(text || '').split(/\r?\n/).find(line => line.trim().length > 0) || '';
+    const commaCount = (previewLine.match(/,/g) || []).length;
+    const semicolonCount = (previewLine.match(/;/g) || []).length;
+    return semicolonCount > commaCount ? ';' : ',';
+  };
+
+  const parseCsvText = (text, delimiter) => {
+    const rows = [];
+    let row = [];
+    let value = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          value += '"';
+          i += 1;
+          continue;
+        }
+
+        inQuotes = !inQuotes;
+        continue;
+      }
+
+      if (!inQuotes && char === delimiter) {
+        row.push(value);
+        value = '';
+        continue;
+      }
+
+      if (!inQuotes && (char === '\n' || char === '\r')) {
+        if (char === '\r' && nextChar === '\n') {
+          i += 1;
+        }
+
+        row.push(value);
+        rows.push(row);
+        row = [];
+        value = '';
+        continue;
+      }
+
+      value += char;
+    }
+
+    row.push(value);
+    rows.push(row);
+
+    if (inQuotes) {
+      throw new Error('El CSV contiene comillas sin cerrar.');
+    }
+
+    return rows;
+  };
+
+  const parseBooleanValue = (value) => {
+    const normalized = normalizeFieldKey(value);
+    if (!normalized) return false;
+    return ['true', '1', 'si', 'yes', 'y', 'verdadero'].includes(normalized);
+  };
+
+  const isNumberLike = (value) => {
+    if (value === null || value === undefined || String(value).trim() === '') return false;
+    const normalized = String(value).trim().replace(',', '.');
+    return normalized !== '' && Number.isFinite(Number(normalized));
+  };
+
+  const isDateLike = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    const isoLike = /^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/;
+    const shortDateLike = /^\d{2}[/-]\d{2}[/-]\d{4}$/;
+    if (!isoLike.test(raw) && !shortDateLike.test(raw)) return false;
+    return !Number.isNaN(new Date(raw).getTime());
+  };
+
+  const inferFieldTypeFromValues = (values) => {
+    const nonEmpty = values
+      .map(value => String(value || '').trim())
+      .filter(value => value !== '');
+
+    if (nonEmpty.length === 0) return 'text';
+
+    const allBoolean = nonEmpty.every(value => {
+      const normalized = normalizeFieldKey(value);
+      return ['true', 'false', '1', '0', 'si', 'no', 'yes', 'y', 'n', 'verdadero', 'falso'].includes(normalized);
+    });
+
+    if (allBoolean) return 'boolean';
+
+    const allNumber = nonEmpty.every(value => isNumberLike(value));
+    if (allNumber) return 'number';
+
+    const allDate = nonEmpty.every(value => isDateLike(value));
+    if (allDate) return 'date';
+
+    return 'text';
+  };
+
+  const buildValueByType = (dataType, rawValue) => {
+    const stringValue = String(rawValue ?? '').trim();
+
+    if (dataType === 'boolean') {
+      return { valueBoolean: parseBooleanValue(stringValue) };
+    }
+
+    if (dataType === 'number') {
+      const normalized = stringValue.replace(',', '.');
+      const parsed = Number(normalized);
+      return { valueNumber: Number.isFinite(parsed) ? parsed : 0 };
+    }
+
+    if (dataType === 'date') {
+      if (!stringValue) return { valueDate: new Date().toISOString() };
+      const parsed = new Date(stringValue);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error(`La fecha "${stringValue}" no es valida.`);
+      }
+      return { valueDate: parsed.toISOString() };
+    }
+
+    return { valueText: stringValue };
+  };
+
+  const parseSpreadsheetFile = async (file) => {
+    if (isXlsxFile(file.name)) {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        throw new Error('El archivo .xlsx no contiene hojas.');
+      }
+
+      const firstSheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json(firstSheet, {
+        header: 1,
+        raw: false,
+        blankrows: false,
+        defval: ''
+      });
+
+      return rows.map((row) =>
+        Array.isArray(row) ? row.map((cell) => String(cell ?? '').trim()) : []
+      );
+    }
+
+    if (isCsvFile(file.name)) {
+      const rawText = await file.text();
+      const csvText = String(rawText || '').replace(/^\uFEFF/, '');
+      const delimiter = detectDelimiter(csvText);
+
+      return parseCsvText(csvText, delimiter)
+        .map(row => row.map(cell => String(cell || '').trim()));
+    }
+
+    throw new Error('Formato no soportado. Solo se aceptan archivos .csv o .xlsx.');
+  };
 
   // Load samples and templates on component mount
   useEffect(() => {
@@ -246,6 +432,301 @@ export default function SamplesTable() {
     setShowDeleteModal(true);
   };
 
+  const handleImportClick = (projectId) => {
+    const input = fileInputRefs.current[projectId];
+    if (!input) return;
+    input.value = '';
+    input.click();
+  };
+
+  const resetImportDraft = () => {
+    setImportDraft(null);
+    setImportTemplateName('');
+    setImportFieldSettings([]);
+    setImportModalError(null);
+    setShowImportTemplateModal(false);
+  };
+
+  const runBulkImport = async ({ project, rows, template }) => {
+    const headerRow = rows[0];
+    const sampleRows = rows.slice(1);
+
+    const templateFields = Array.isArray(template.fields) ? template.fields : [];
+    if (templateFields.length === 0) {
+      throw new Error('La plantilla no contiene campos para mapear el archivo importado.');
+    }
+
+    const headerMeta = headerRow.map((header, index) => ({
+      original: header,
+      normalized: normalizeFieldKey(header),
+      index
+    }));
+
+    const templateColumns = headerMeta.filter((column, index) => index !== 0);
+
+    const templateFieldMap = new Map(
+      templateFields.map((field) => [normalizeFieldKey(field.name), field])
+    );
+
+    const unmatchedColumns = templateColumns
+      .filter(column => !templateFieldMap.has(column.normalized))
+      .map(column => column.original);
+
+    if (unmatchedColumns.length > 0) {
+      throw new Error(`Los siguientes campos no existen en la plantilla: ${unmatchedColumns.join(', ')}.`);
+    }
+
+    const requiredTemplateFields = templateFields
+      .filter(field => field.required)
+      .map(field => normalizeFieldKey(field.name));
+
+    const csvFieldNames = new Set(templateColumns.map(column => column.normalized));
+    const missingRequiredFields = requiredTemplateFields
+      .filter(fieldName => !csvFieldNames.has(fieldName));
+
+    if (missingRequiredFields.length > 0) {
+      throw new Error(`Faltan campos requeridos de la plantilla: ${missingRequiredFields.join(', ')}.`);
+    }
+
+    const mappedColumns = templateColumns.map(column => ({
+      ...column,
+      templateField: templateFieldMap.get(column.normalized)
+    }));
+
+    const samplesPayload = sampleRows.map((row, rowIndex) => {
+      const code = String(row[0] || '').trim();
+      if (!code) {
+        throw new Error(`La fila ${rowIndex + 2} no tiene valor en la columna code.`);
+      }
+
+      const values = mappedColumns.map(column => {
+        const rawValue = row[column.index];
+        const typedValue = buildValueByType(column.templateField.dataType, rawValue);
+
+        return {
+          fieldId: column.templateField.id,
+          ...typedValue
+        };
+      });
+
+      return {
+        code,
+        templateId: template.id,
+        projectId: project.id,
+        status: 'pending',
+        values
+      };
+    });
+
+    await apiService.samples.createManyWithValues({ samples: samplesPayload });
+
+    await loadData();
+    setImportMessage(
+      `Se importaron ${samplesPayload.length} muestras en el proyecto "${project.name}" con la plantilla "${template.name}".`
+    );
+  };
+
+  const confirmTemplateFromDraft = async () => {
+    if (!importDraft) return;
+
+    const name = String(importTemplateName || '').trim();
+    if (!name) {
+      setImportModalError('Debes indicar un nombre de plantilla para continuar.');
+      return;
+    }
+
+    if (!Array.isArray(importFieldSettings) || importFieldSettings.length === 0) {
+      setImportModalError('No hay campos para crear la plantilla.');
+      return;
+    }
+
+    try {
+      setImportModalError(null);
+      setImportingProjectId(importDraft.project.id);
+
+      const existingTemplateByName = templates.find(
+        (template) => normalizeFieldKey(template.name) === normalizeFieldKey(name)
+      );
+
+      if (existingTemplateByName) {
+        const projectHasTemplate = samples.some(
+          (sample) =>
+            (sample.project?.id || sample.projectId) === importDraft.project.id &&
+            (sample.template?.id || sample.templateId) === existingTemplateByName.id
+        );
+
+        window.alert(`La plantilla "${existingTemplateByName.name}" ya existe en el sistema.`);
+
+        if (projectHasTemplate) {
+          window.alert('Esta plantilla ya esta asociada al proyecto. Solo se agregaran nuevas muestras.');
+        }
+
+        const shouldUseExistingTemplate = window.confirm(
+          `La plantilla "${existingTemplateByName.name}" ya existe. ¿Deseas agregar las muestras a esta plantilla?`
+        );
+
+        if (!shouldUseExistingTemplate) {
+          setImportModalError('Importacion cancelada: no se agregaron muestras.');
+          return;
+        }
+
+        const resolvedExistingTemplate = Array.isArray(existingTemplateByName?.fields) && existingTemplateByName.fields.length > 0
+          ? existingTemplateByName
+          : await apiService.templates.getById(existingTemplateByName.id);
+
+        await runBulkImport({
+          project: importDraft.project,
+          rows: importDraft.rows,
+          template: resolvedExistingTemplate
+        });
+
+        resetImportDraft();
+        return;
+      }
+
+      const shouldCreateTemplate = window.confirm(
+        `No existe una plantilla llamada "${name}". ¿Deseas crearla e importar las muestras?`
+      );
+
+      if (!shouldCreateTemplate) {
+        setImportModalError('Importacion cancelada: plantilla no creada.');
+        return;
+      }
+
+      const createdTemplate = await apiService.templates.createWithFields({
+        name,
+        description: `Plantilla creada por importacion para ${importDraft.project.name}`,
+        fields: importFieldSettings.map((field, index) => ({
+          name: field.name,
+          dataType: field.dataType,
+          required: Boolean(field.required),
+          orderIndex: index
+        }))
+      });
+
+      const resolvedTemplate = Array.isArray(createdTemplate?.fields) && createdTemplate.fields.length > 0
+        ? createdTemplate
+        : await apiService.templates.getById(createdTemplate.id);
+
+      await runBulkImport({
+        project: importDraft.project,
+        rows: importDraft.rows,
+        template: resolvedTemplate
+      });
+
+      resetImportDraft();
+    } catch (err) {
+      setImportModalError(err.message || 'No se pudo importar. Verifica si hay codigos de muestra duplicados.');
+    } finally {
+      setImportingProjectId(null);
+    }
+  };
+
+  const handleImportFileChange = async (project, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    setImportMessage(null);
+    setImportModalError(null);
+    setImportingProjectId(project.id);
+
+    try {
+      const fileNameWithoutExtension = file.name.replace(/\.[^/.]+$/, '').trim();
+      const suggestedTemplateName = fileNameWithoutExtension || `Plantilla ${project.name}`;
+
+      const parsedRows = await parseSpreadsheetFile(file);
+
+      const contentRows = parsedRows.filter(row => row.some(cell => cell !== ''));
+      if (contentRows.length < 2) {
+        throw new Error('El archivo debe contener encabezados y al menos una fila de muestra.');
+      }
+
+      const headerRow = contentRows[0];
+      const sampleRows = contentRows.slice(1);
+
+      const width = headerRow.length;
+      if (width < 2) {
+        throw new Error('El archivo debe tener la columna code y al menos una columna de campo.');
+      }
+
+      const normalizedSampleRows = sampleRows.map((row, index) => {
+        if (row.length > width) {
+          throw new Error(`La fila ${index + 2} tiene ${row.length} columnas y se esperaban ${width}.`);
+        }
+
+        if (row.length === width) {
+          return row;
+        }
+
+        return [...row, ...new Array(width - row.length).fill('')];
+      });
+
+      const headerMeta = headerRow.map((header, index) => ({
+        original: header,
+        normalized: normalizeFieldKey(header),
+        index
+      }));
+
+      if (headerMeta.some(h => !h.normalized)) {
+        throw new Error('Todos los encabezados de la primera fila deben tener nombre.');
+      }
+
+      const duplicateHeaders = headerMeta.filter((header, idx) =>
+        headerMeta.findIndex(item => item.normalized === header.normalized) !== idx
+      );
+      if (duplicateHeaders.length > 0) {
+        throw new Error(`Hay columnas duplicadas: ${duplicateHeaders.map(h => h.original).join(', ')}.`);
+      }
+
+      const firstColumn = headerMeta[0];
+      if (!firstColumn || firstColumn.normalized !== 'code') {
+        throw new Error('La primera columna debe llamarse exactamente code.');
+      }
+
+      const templateColumns = headerMeta.slice(1);
+
+      if (templateColumns.length === 0) {
+        throw new Error('No hay columnas para construir campos de plantilla.');
+      }
+
+      const rowsWithEmptyCode = normalizedSampleRows
+        .map((row, index) => ({ row, rowNumber: index + 2 }))
+        .filter(item => String(item.row[0] || '').trim() === '');
+
+      if (rowsWithEmptyCode.length > 0) {
+        throw new Error(`Hay filas sin code en: ${rowsWithEmptyCode.slice(0, 5).map(item => item.rowNumber).join(', ')}.`);
+      }
+
+      const inferredFieldSettings = templateColumns.map((column) => {
+        const columnValues = normalizedSampleRows.map(row => row[column.index]);
+        const hasEmptyValues = columnValues.some(value => String(value || '').trim() === '');
+
+        return {
+          name: column.original,
+          dataType: inferFieldTypeFromValues(columnValues),
+          required: !hasEmptyValues
+        };
+      });
+
+      setImportDraft({
+        project,
+        rows: [headerRow, ...normalizedSampleRows]
+      });
+      setImportTemplateName(suggestedTemplateName);
+      setImportFieldSettings(inferredFieldSettings);
+      setImportModalError(null);
+      setShowImportTemplateModal(true);
+    } catch (err) {
+      setError(err.message || 'Error al importar el archivo.');
+    } finally {
+      setImportingProjectId(null);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   const confirmDelete = async () => {
     if (!sampleToDelete) return;
     try {
@@ -325,7 +806,19 @@ export default function SamplesTable() {
     }).filter(t => t.samples.length > 0);
 
     return { ...project, templates: projectTemplates, totalSamples: projectSamples.length };
-  }).filter(p => p.totalSamples > 0);
+  });
+
+  const existingTemplateForImport = showImportTemplateModal
+    ? templates.find(
+      (template) => normalizeFieldKey(template.name) === normalizeFieldKey(importTemplateName)
+    )
+    : null;
+
+  const isExistingTemplateAssociatedToProject = Boolean(existingTemplateForImport && importDraft && samples.some(
+    (sample) =>
+      (sample.project?.id || sample.projectId) === importDraft.project.id &&
+      (sample.template?.id || sample.templateId) === existingTemplateForImport.id
+  ));
 
   if (loading) {
     return (
@@ -340,6 +833,12 @@ export default function SamplesTable() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
           {error}
+        </div>
+      )}
+
+      {importMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-emerald-800">
+          {importMessage}
         </div>
       )}
 
@@ -382,20 +881,50 @@ export default function SamplesTable() {
           {groupedDataByProject.map((project) => (
             <div key={project.id} className="space-y-4">
               {/* Project Bar */}
-              <div className="bg-slate-900 text-white px-6 py-3 rounded-lg flex items-center justify-between shadow-md">
+              <div className="bg-slate-900 text-white px-6 py-3 rounded-lg flex items-center justify-between shadow-md gap-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-teal-500 p-1.5 rounded-md text-white">
                     <Icon icon={faFolderOpen} size={14} color="currentColor" />
                   </div>
-                  <h2 className="text-lg font-bold">Proyecto: {project.name}</h2>
+                  <h2 className="text-lg font-bold flex items-center gap-3">
+                    <span>Proyecto: {project.name}</span>
+                    <span className="bg-emerald-950/40 text-emerald-300 px-2 py-1 rounded border border-emerald-400/30 text-[10px] font-mono uppercase tracking-widest">
+                      ID: {String(project.id || '').slice(0, 8)}
+                    </span>
+                  </h2>
                 </div>
-                <div className="bg-emerald-950/40 text-emerald-400 px-3 py-1 rounded border border-emerald-500/20 text-[10px] font-mono uppercase tracking-widest">
-                  ID: {project.id.slice(0, 8)}
+
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={(element) => {
+                      if (element) {
+                        fileInputRefs.current[project.id] = element;
+                      }
+                    }}
+                    type="file"
+                    accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={(event) => handleImportFileChange(project, event)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleImportClick(project.id)}
+                    disabled={isSubmitting || importingProjectId === project.id}
+                    className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider hover:bg-emerald-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importingProjectId === project.id ? 'Importando...' : 'Importar'}
+                  </button>
                 </div>
               </div>
 
               {/* Templates under Project */}
               <div className="space-y-6">
+                {project.templates.length === 0 && (
+                  <div className="ml-4 bg-white border border-gray-100 rounded-xl p-6 text-sm text-gray-500 shadow-sm">
+                    Este proyecto aun no tiene muestras asociadas. Puedes usar "Importar" para cargar nuevas muestras.
+                  </div>
+                )}
+
                 {project.templates.map(template => (
                   <div key={`${project.id}-${template.id}`} className="ml-4 bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
                     {/* Template Header */}
@@ -625,6 +1154,127 @@ export default function SamplesTable() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* IMPORT TEMPLATE CONFIG MODAL */}
+      {showImportTemplateModal && importDraft && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
+            <div className="bg-emerald-700 px-6 py-4 flex items-center justify-between text-white">
+              <div>
+                <h3 className="text-lg font-bold">Configurar Plantilla Para Importacion</h3>
+                <p className="text-xs text-emerald-100 mt-1">
+                  Proyecto: {importDraft.project.name}
+                </p>
+              </div>
+              <button
+                onClick={resetImportDraft}
+                className="bg-white/20 hover:bg-white/30 p-1.5 rounded-lg transition"
+              >
+                <span className="block text-xl leading-none">&times;</span>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-auto">
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-4 text-sm">
+                La primera columna <span className="font-black">code</span> se usara para el codigo obligatorio de cada muestra. No se creara un campo nuevo llamado code.
+              </div>
+
+              {existingTemplateForImport && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-sm">
+                  La plantilla <span className="font-black">{existingTemplateForImport.name}</span> ya existe en general.
+                  {isExistingTemplateAssociatedToProject
+                    ? ' Ya esta asociada a este proyecto: solo se agregaran nuevas muestras a esa plantilla.'
+                    : ' Se usara esta plantilla existente para agregar las muestras.'}
+                </div>
+              )}
+
+              {importModalError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm font-semibold">
+                  {importModalError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                  Nombre de la plantilla
+                </label>
+                <input
+                  type="text"
+                  value={importTemplateName}
+                  onChange={(e) => {
+                    setImportTemplateName(e.target.value);
+                    if (importModalError) {
+                      setImportModalError(null);
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-gray-700"
+                  placeholder="Ej: Plantilla de importacion"
+                />
+              </div>
+
+              <div>
+                <h4 className="text-sm font-black text-gray-700 uppercase tracking-wider mb-3">
+                  Campos detectados y requeridos
+                </h4>
+
+                <div className="space-y-2">
+                  {importFieldSettings.map((field, index) => (
+                    <div key={`${field.name}-${index}`} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">{field.name}</p>
+                        <p className="text-[11px] text-gray-500">Tipo detectado: {field.dataType}</p>
+                      </div>
+
+                      <label className="inline-flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wide">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(field.required)}
+                          onChange={(e) => setImportFieldSettings((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, required: e.target.checked }
+                                : item
+                            )
+                          )}
+                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        Required
+                      </label>
+
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-100 rounded px-2 py-1">
+                        {field.required ? 'Si' : 'No'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={resetImportDraft}
+                  className="flex-1 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmTemplateFromDraft}
+                  disabled={importingProjectId === importDraft.project.id}
+                  className="flex-1 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-200 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Icon icon={faFloppyDisk} size={14} color="currentColor" />
+                  {importingProjectId === importDraft.project.id
+                    ? 'Importando...'
+                    : existingTemplateForImport
+                      ? 'Agregar Muestras a Plantilla Existente'
+                      : 'Crear Plantilla e Importar'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

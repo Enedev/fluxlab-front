@@ -361,6 +361,13 @@ export const apiService = {
       });
     },
 
+    async createManyWithValues(payload) {
+      return apiRequest('/samples/bulk-with-values', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+
     async update(id, sampleData) {
       return apiRequest(`/samples/${id}`, {
         method: 'PATCH',
