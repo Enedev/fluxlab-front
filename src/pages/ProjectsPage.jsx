@@ -13,6 +13,13 @@ const INITIAL_PROJECT_FORM = {
   status: 'active'
 };
 
+const INITIAL_FILTERS = {
+  name: '',
+  status: '',
+  fromDate: '',
+  toDate: '',
+};
+
 function toNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -127,6 +134,24 @@ function getProjectStatusMeta(status) {
     label: 'ACTIVO',
     classes: 'text-emerald-700 bg-emerald-50 border border-emerald-100'
   };
+}
+
+function translateStatus(status) {
+  const lowerStatus = toSafeText(status).toLowerCase();
+  switch (lowerStatus) {
+    case 'active':
+      return 'Activo';
+    case 'inactive':
+      return 'Inactivo';
+    case 'on_hold':
+      return 'En Pausa';
+    case 'completed':
+      return 'Completado';
+    case 'archived':
+      return 'Archivado';
+    default:
+      return toSafeText(status);
+  }
 }
 
 function normalizeSampleStatus(value) {
@@ -441,6 +466,8 @@ export default function ProjectsPage() {
 
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
+  const [availableStatuses, setAvailableStatuses] = useState([]);
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -460,11 +487,13 @@ export default function ProjectsPage() {
     setLoading(true);
     setError('');
 
-    const [projectsResult, repositoryResult, clientsResult] = await Promise.allSettled([
-      apiService.projects.getAll(),
-      apiService.samples.getRepository(),
-      apiService.clients.getAll()
-    ]);
+    const [projectsResult, repositoryResult, clientsResult, statusesResult] =
+      await Promise.allSettled([
+        apiService.projects.getAll(),
+        apiService.samples.getRepository(),
+        apiService.clients.getAll(),
+        apiService.projects.getAvailableStatuses(),
+      ]);
 
     const errors = [];
     let baseProjects = [];
@@ -507,7 +536,7 @@ export default function ProjectsPage() {
 
       const mergedIds = new Set(mergedProjects.map((project) => String(project.id)));
       const repositoryOnlyProjects = repositoryProjects.filter(
-        (project) => !mergedIds.has(String(project.id))
+        (project) => !mergedIds.has(String(project.id)),
       );
 
       setProjects([...mergedProjects, ...repositoryOnlyProjects]);
@@ -522,13 +551,77 @@ export default function ProjectsPage() {
       errors.push(String(clientsResult.reason?.message || 'No se pudieron cargar los clientes desde el backend.'));
     }
 
+    if (statusesResult.status === 'fulfilled') {
+      setAvailableStatuses(statusesResult.value || []);
+    } else {
+      setAvailableStatuses([]);
+      errors.push(
+        String(
+          statusesResult.reason?.message ||
+            'No se pudieron cargar los estados de los proyectos.',
+        ),
+      );
+    }
+
     setError(errors.join(' '));
     setLoading(false);
+  };
+
+  const applyFilters = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const { name, status, fromDate, toDate } = filters;
+      let response;
+
+      if (name) {
+        response = await apiService.projects.searchByName(name);
+      } else if (status) {
+        response = await apiService.projects.filterByStatus(status);
+      } else if (fromDate && toDate) {
+        response = await apiService.projects.filterByDateRange(fromDate, toDate);
+      } else {
+        loadPageData();
+        return;
+      }
+
+      const parsedProjects = parseProjectsResponse(response);
+      setProjects(parsedProjects);
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.message || err.message || 'Fallo al aplicar los cambios';
+      setError(errorMessage);
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadPageData();
   }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (
+        filters.name ||
+        filters.status ||
+        (filters.fromDate && filters.toDate)
+      ) {
+        applyFilters();
+      } else if (
+        !filters.name &&
+        !filters.status &&
+        !filters.fromDate &&
+        !filters.toDate
+      ) {
+        loadPageData();
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filters]);
 
   useEffect(() => {
     if (!expandedProjectId) {
@@ -734,6 +827,18 @@ export default function ProjectsPage() {
     setExpandedProjectId((current) => (isSameId(current, projectId) ? null : projectId));
   };
 
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target;
+    setFilters((prevFilters) => ({
+      ...prevFilters,
+      [name]: value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters(INITIAL_FILTERS);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar />
@@ -756,6 +861,62 @@ export default function ProjectsPage() {
                 <span className="text-lg leading-none">+</span>
                 Crear Nuevo Proyecto
               </button>
+            </div>
+
+            <div className="mt-6 bg-white p-4 rounded-lg shadow-md">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <input
+                  type="text"
+                  name="name"
+                  value={filters.name}
+                  onChange={handleFilterChange}
+                  placeholder="Buscar por nombre"
+                  className="p-2 border rounded-md"
+                />
+                <select
+                  name="status"
+                  value={filters.status}
+                  onChange={handleFilterChange}
+                  className="p-2 border rounded-md"
+                >
+                  <option value="">Todos los estados</option>
+                  {availableStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {translateStatus(status)}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 mb-1">Desde</label>
+                  <input
+                    type="date"
+                    name="fromDate"
+                    value={filters.fromDate}
+                    onChange={handleFilterChange}
+                    max={createEndDateBounds.min}
+                    className="p-2 border rounded-md"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 mb-1">Hasta</label>
+                  <input
+                    type="date"
+                    name="toDate"
+                    value={filters.toDate}
+                    onChange={handleFilterChange}
+                    max={createEndDateBounds.min}
+                    className="p-2 border rounded-md"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={clearFilters}
+                  className="text-gray-600 hover:text-gray-800"
+                >
+                  Limpiar filtros
+                </button>
+              </div>
             </div>
 
             {error && (

@@ -289,6 +289,27 @@ export const apiService = {
       return apiRequest(endpoint);
     },
 
+    async filterByDateRange(fromDate, toDate, clientId) {
+      const searchParams = new URLSearchParams();
+
+      if (fromDate && String(fromDate).trim()) {
+        searchParams.append('fromDate', String(fromDate).trim());
+      }
+
+      if (toDate && String(toDate).trim()) {
+        searchParams.append('toDate', String(toDate).trim());
+      }
+
+      if (clientId && String(clientId).trim()) {
+        searchParams.append('clientId', String(clientId).trim());
+      }
+
+      const query = searchParams.toString();
+      const endpoint = query ? `/projects/date-range?${query}` : '/projects/date-range';
+
+      return apiRequest(endpoint);
+    },
+
     async getAvailableStatuses(clientId) {
       const searchParams = new URLSearchParams();
 
