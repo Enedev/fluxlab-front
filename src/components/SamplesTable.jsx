@@ -49,6 +49,7 @@ export default function SamplesTable() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [sampleToDelete, setSampleToDelete] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,6 +70,8 @@ export default function SamplesTable() {
     templateId: '',
     status: 'pending'
   });
+
+  const [allSamples, setAllSamples] = useState([]);
 
   const normalizeText = (value) => {
     return String(value || '')
@@ -271,7 +274,9 @@ export default function SamplesTable() {
         })
       ]);
 
-      setSamples(Array.isArray(samplesData) ? samplesData : []);
+      const samplesArray = Array.isArray(samplesData) ? samplesData : [];
+      setSamples(samplesArray);
+      setAllSamples(samplesArray);
       setTemplates(Array.isArray(templatesData) ? templatesData : []);
       
       const projectsList = projectsResponse?.data && Array.isArray(projectsResponse.data) 
@@ -313,6 +318,20 @@ export default function SamplesTable() {
   const cancelEditing = () => {
     setEditingId(null);
     setEditFormData({ status: '', fieldValues: {} });
+  };
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    
+    if (query.trim() === '') {
+      setSamples(allSamples);
+    } else {
+      const normalizedQuery = normalizeText(query);
+      const filtered = allSamples.filter(sample => 
+        normalizeText(sample.code).includes(normalizedQuery)
+      );
+      setSamples(filtered);
+    }
   };
 
   const saveInlineEdit = async (event, sample) => {
@@ -914,20 +933,16 @@ export default function SamplesTable() {
           <p className="text-xs text-gray-500 pl-3 mt-1 font-bold">{samples.length} muestras en total</p>
         </div>
         
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* descomentar esto de filtrado */}
-          {/* <div className="w-full md:w-48">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="pending">Pendiente</option>
-              <option value="completed">Completado</option>
-              <option value="rejected">Rechazado</option>
-            </select>
-          </div> */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+          <div className="flex-1 md:flex-none md:w-64">
+            <input
+              type="text"
+              placeholder="Buscar por código de muestra..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            />
+          </div>
           <button 
             type="button"
             onClick={() => setShowCreateModal(true)}
