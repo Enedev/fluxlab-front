@@ -4,7 +4,7 @@
  * Manage and view clients with backend integration.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   faEllipsisVertical,
   faPenToSquare,
@@ -19,22 +19,19 @@ import Sidebar from '../components/Sidebar';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-// Paginacion de clientes (temporalmente deshabilitada)
-// const ITEMS_PER_PAGE = 10;
-
-// Filtro por estado (temporalmente deshabilitado)
-// const STATUS_OPTIONS = [
-//   { value: 'all', label: 'Estado: Todos' },
-//   { value: 'active', label: 'Activo' },
-//   { value: 'inactive', label: 'Inactivo' }
-// ];
-
 const INITIAL_CLIENT_FORM = {
   name: '',
   email: '',
   phoneNumber: '',
   status: 'active',
   address: ''
+};
+
+const INITIAL_CLIENT_FILTERS = {
+  name: '',
+  status: '',
+  fromDate: '',
+  toDate: '',
 };
 
 function toNumber(value, fallback = 0) {
@@ -168,6 +165,23 @@ function isValidPhoneNumber(value) {
   return digitsOnly.length >= 7 && digitsOnly.length <= 15;
 }
 
+function normalizeClientFilters(filters) {
+  return {
+    name: String(filters?.name || '').trim(),
+    status: String(filters?.status || '').trim(),
+    fromDate: String(filters?.fromDate || '').trim(),
+    toDate: String(filters?.toDate || '').trim(),
+  };
+}
+
+function formatLocalDateForInput(date) {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 export default function ClientsPage() {
   const { getUserRole } = useAuth();
   const canRegisterClients = getUserRole() === 'admin';
@@ -177,14 +191,11 @@ export default function ClientsPage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Barra de busqueda de clientes (temporalmente deshabilitada)
-  // const [searchTerm, setSearchTerm] = useState('');
-  // Filtro por estado (temporalmente deshabilitado)
-  // const [statusFilter, setStatusFilter] = useState('all');
-  // Paginacion de clientes (temporalmente deshabilitada)
-  // const [currentPage, setCurrentPage] = useState(1);
+  const [filters, setFilters] = useState(INITIAL_CLIENT_FILTERS);
   const [totalClientsFromApi, setTotalClientsFromApi] = useState(0);
+  const filterDateMax = useMemo(() => formatLocalDateForInput(new Date()), []);
+  const requestsVersionRef = useRef(0);
+  const hasInitializedFiltersRef = useRef(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createClientForm, setCreateClientForm] = useState(INITIAL_CLIENT_FORM);
@@ -202,18 +213,43 @@ export default function ClientsPage() {
   const [editClientError, setEditClientError] = useState('');
   const [updatingClient, setUpdatingClient] = useState(false);
 
-  const loadClients = async () => {
+  const loadClients = async (nextFilters = INITIAL_CLIENT_FILTERS) => {
+    const normalizedFilters = normalizeClientFilters(nextFilters);
+
+    if (
+      normalizedFilters.fromDate &&
+      normalizedFilters.toDate &&
+      normalizedFilters.fromDate > normalizedFilters.toDate
+    ) {
+      requestsVersionRef.current += 1;
+      setLoading(false);
+      setError('La fecha "Desde" no puede ser mayor que la fecha "Hasta".');
+      return;
+    }
+
+    const requestVersion = requestsVersionRef.current + 1;
+    requestsVersionRef.current = requestVersion;
+
     try {
       setLoading(true);
       setError('');
 
-      const response = await apiService.clients.getAll();
+      const response = await apiService.clients.getAll(normalizedFilters);
+
+      if (requestVersion !== requestsVersionRef.current) {
+        return;
+      }
+
       const { items, total } = parseClientsResponse(response);
       const normalizedClients = items.map((item, index) => normalizeClient(item, index));
 
       setClients(normalizedClients);
       setTotalClientsFromApi(total);
     } catch (err) {
+      if (requestVersion !== requestsVersionRef.current) {
+        return;
+      }
+
       const errorMessage = String(err?.message || 'No fue posible cargar clientes.');
       if (errorMessage.toLowerCase().includes('401') || errorMessage.toLowerCase().includes('unauthorized')) {
         setError('Tu sesion no esta autorizada para /api/clients. Inicia sesion nuevamente.');
@@ -221,52 +257,32 @@ export default function ClientsPage() {
         setError(errorMessage);
       }
     } finally {
-      setLoading(false);
+      if (requestVersion === requestsVersionRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadClients();
+    loadClients(INITIAL_CLIENT_FILTERS);
   }, []);
 
+  useEffect(() => {
+    if (!hasInitializedFiltersRef.current) {
+      hasInitializedFiltersRef.current = true;
+      return undefined;
+    }
+
+    const delayDebounceFn = setTimeout(() => {
+      loadClients(filters);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filters]);
+
   const filteredClients = useMemo(() => {
-    // Logica de busqueda por texto (temporalmente deshabilitada)
-    // const term = searchTerm.trim().toLowerCase();
-    // return clients.filter((client) =>
-    //   !term ||
-    //   client.name.toLowerCase().includes(term) ||
-    //   client.email.toLowerCase().includes(term) ||
-    //   client.phoneNumber.toLowerCase().includes(term) ||
-    //   client.displayId.toLowerCase().includes(term) ||
-    //   client.address.toLowerCase().includes(term)
-    // );
-
-    // Filtro por estado (temporalmente deshabilitado)
-    // return clients.filter((client) =>
-    //   statusFilter === 'all' || client.status === statusFilter
-    // );
-
     return clients;
   }, [clients]);
-
-  // Paginacion de clientes (temporalmente deshabilitada)
-  // const totalPages = Math.max(1, Math.ceil(filteredClients.length / ITEMS_PER_PAGE));
-  // const safeCurrentPage = Math.min(currentPage, totalPages);
-  // const paginatedClients = useMemo(() => {
-  //   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-  //   return filteredClients.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  // }, [filteredClients, safeCurrentPage]);
-  // const pageButtons = useMemo(() => {
-  //   const pages = [];
-  //   const start = Math.max(1, safeCurrentPage - 2);
-  //   const end = Math.min(totalPages, start + 4);
-  //
-  //   for (let page = start; page <= end; page += 1) {
-  //     pages.push(page);
-  //   }
-  //
-  //   return pages;
-  // }, [safeCurrentPage, totalPages]);
 
   const stats = useMemo(() => {
     const totalVisible = totalClientsFromApi || clients.length;
@@ -341,7 +357,7 @@ export default function ClientsPage() {
 
       setShowCreateModal(false);
       setCreateClientForm(INITIAL_CLIENT_FORM);
-      await loadClients();
+      await loadClients(filters);
     } catch (err) {
       const errorMessage = String(err?.message || 'No fue posible registrar el cliente.');
 
@@ -414,7 +430,7 @@ export default function ClientsPage() {
 
       setShowEditModal(false);
       setEditingClient(null);
-      await loadClients();
+      await loadClients(filters);
     } catch (err) {
       const errorMessage = String(err?.message || 'No fue posible actualizar el cliente.');
       setEditClientError(errorMessage);
@@ -450,7 +466,7 @@ export default function ClientsPage() {
     try {
       setDeletingClientId(deletingId);
       await apiService.clients.remove(deletingId, true);
-      await loadClients();
+      await loadClients(filters);
       setShowDeleteModal(false);
       setClientToDelete(null);
     } catch (err) {
@@ -461,6 +477,20 @@ export default function ClientsPage() {
       setDeletingClientId(null);
       setClientToDelete(null);
     }
+  };
+
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target;
+
+    setFilters((previousFilters) => ({
+      ...previousFilters,
+      [name]: value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setError('');
+    setFilters(INITIAL_CLIENT_FILTERS);
   };
 
   const renderTableBody = () => {
@@ -598,7 +628,7 @@ export default function ClientsPage() {
                 <p className="text-sm text-red-700 font-medium">{error}</p>
                 <button
                   type="button"
-                  onClick={loadClients}
+                  onClick={() => loadClients(filters)}
                   className="inline-flex items-center justify-center text-sm bg-white border border-red-200 text-red-700 px-3 py-1 rounded hover:bg-red-100"
                 >
                   Reintentar
@@ -632,45 +662,73 @@ export default function ClientsPage() {
               </article>
             </div>
 
-            <section className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {/* Barra de busqueda de clientes (temporalmente deshabilitada) */}
-                  {/*
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="Buscar por nombre, correo, telefono o ID"
-                      className="w-full sm:w-80 px-10 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">ICONO_BUSCAR</span>
-                  </div>
-                  */}
-
-                  {/* Filtro por estado (temporalmente deshabilitado) */}
-                  {/*
-                  <select
-                    value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  */}
+            <div className="mt-6 bg-white p-4 rounded-lg shadow-md">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Name search — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <input
+                    type="text"
+                    name="name"
+                    value={filters.name}
+                    onChange={handleFilterChange}
+                    placeholder="Buscar por nombre"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  />
                 </div>
 
-                {/* Texto de conteo de clientes (temporalmente deshabilitado) */}
-                {/*
-                <p className="text-sm text-gray-500">
-                  Mostrando {filteredClients.length} de {stats.totalVisible} clientes
-                </p>
-                */}
+                {/* Status select — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleFilterChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  >
+                    <option value="">Todos los estados</option>
+                    <option value="active">Activo</option>
+                    <option value="inactive">Inactivo</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 mb-1">Desde</label>
+                  <input
+                    type="date"
+                    name="fromDate"
+                    value={filters.fromDate}
+                    onChange={handleFilterChange}
+                    max={filterDateMax}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-500 mb-1">Hasta</label>
+                  <input
+                    type="date"
+                    name="toDate"
+                    value={filters.toDate}
+                    onChange={handleFilterChange}
+                    max={filterDateMax}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-gray-600 hover:text-gray-800"
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+
+            <section className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <p className="text-sm text-gray-500">Resultados filtrados en tiempo real desde el backend.</p>
               </div>
 
               <div className="overflow-x-auto">
@@ -690,63 +748,6 @@ export default function ClientsPage() {
                   <tbody>{renderTableBody()}</tbody>
                 </table>
               </div>
-
-              {/* Paginacion de clientes (temporalmente deshabilitada) */}
-              {/*
-              <div className="px-6 py-4 border-t border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((previousPage) => Math.max(previousPage - 1, 1))}
-                    disabled={safeCurrentPage === 1}
-                    className="inline-flex items-center justify-center !p-0 w-8 h-8 border border-gray-300 rounded text-gray-700 leading-none hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ‹
-                  </button>
-
-                  {pageButtons.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setCurrentPage(page)}
-                      className={`inline-flex items-center justify-center !p-0 w-8 h-8 rounded text-sm leading-none border transition ${
-                        page === safeCurrentPage
-                          ? '!bg-emerald-500 !text-gray-900 border-emerald-500'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((previousPage) => Math.min(previousPage + 1, totalPages))}
-                    disabled={safeCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center !p-0 w-8 h-8 border border-gray-300 rounded text-gray-700 leading-none hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ›
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <span>Ir a pagina:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={totalPages}
-                    value={safeCurrentPage}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      if (!Number.isNaN(value)) {
-                        setCurrentPage(Math.min(Math.max(value, 1), totalPages));
-                      }
-                    }}
-                    className="w-16 px-2 py-1 border border-gray-300 rounded text-gray-700"
-                  />
-                </div>
-              </div>
-              */}
             </section>
 
             <div className="mt-6 border-t border-gray-200 pt-4 text-xs text-gray-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

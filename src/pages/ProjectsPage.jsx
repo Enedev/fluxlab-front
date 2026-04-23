@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
@@ -19,6 +19,26 @@ const INITIAL_FILTERS = {
   fromDate: '',
   toDate: '',
 };
+
+function normalizeProjectFilters(filters) {
+  return {
+    name: String(filters?.name || '').trim(),
+    status: String(filters?.status || '').trim(),
+    fromDate: String(filters?.fromDate || '').trim(),
+    toDate: String(filters?.toDate || '').trim(),
+  };
+}
+
+function hasActiveProjectFilters(filters) {
+  const normalizedFilters = normalizeProjectFilters(filters);
+
+  return (
+    Boolean(normalizedFilters.name) ||
+    Boolean(normalizedFilters.status) ||
+    Boolean(normalizedFilters.fromDate) ||
+    Boolean(normalizedFilters.toDate)
+  );
+}
 
 function toNumber(value, fallback = 0) {
   const parsed = Number(value);
@@ -457,6 +477,45 @@ function parseClientsResponse(payload) {
   }));
 }
 
+function mergeProjectsWithRepository(baseProjects, repositoryProjects, includeRepositoryOnly = false) {
+  if (!baseProjects.length && !repositoryProjects.length) {
+    return [];
+  }
+
+  const repositoryById = new Map(
+    repositoryProjects.map((project) => [String(project.id), project])
+  );
+
+  const mergedProjects = baseProjects.map((project) => {
+    const repositoryProject = repositoryById.get(String(project.id));
+
+    if (!repositoryProject) {
+      return project;
+    }
+
+    return {
+      ...project,
+      recentSamplesRaw: repositoryProject.recentSamplesRaw,
+      templatesCount: repositoryProject.templatesCount,
+      associatedSamplesCount:
+        repositoryProject.associatedSamplesCount > 0
+          ? repositoryProject.associatedSamplesCount
+          : project.associatedSamplesCount
+    };
+  });
+
+  if (!includeRepositoryOnly) {
+    return mergedProjects;
+  }
+
+  const mergedIds = new Set(mergedProjects.map((project) => String(project.id)));
+  const repositoryOnlyProjects = repositoryProjects.filter(
+    (project) => !mergedIds.has(String(project.id)),
+  );
+
+  return [...mergedProjects, ...repositoryOnlyProjects];
+}
+
 function isSameId(left, right) {
   return String(left || '').trim() === String(right || '').trim();
 }
@@ -466,10 +525,13 @@ export default function ProjectsPage() {
 
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
+  const [repositoryProjects, setRepositoryProjects] = useState([]);
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const requestsVersionRef = useRef(0);
+  const hasInitializedFiltersRef = useRef(false);
 
   const [expandedProjectId, setExpandedProjectId] = useState(null);
 
@@ -484,117 +546,121 @@ export default function ProjectsPage() {
   const [projectToDelete, setProjectToDelete] = useState(null);
 
   const loadPageData = async () => {
-    setLoading(true);
-    setError('');
+    const requestVersion = requestsVersionRef.current + 1;
+    requestsVersionRef.current = requestVersion;
 
-    const [projectsResult, repositoryResult, clientsResult, statusesResult] =
-      await Promise.allSettled([
-        apiService.projects.getAll(),
-        apiService.samples.getRepository(),
-        apiService.clients.getAll(),
-        apiService.projects.getAvailableStatuses(),
-      ]);
-
-    const errors = [];
-    let baseProjects = [];
-    let repositoryProjects = [];
-
-    if (projectsResult.status === 'fulfilled') {
-      baseProjects = parseProjectsResponse(projectsResult.value);
-    } else {
-      errors.push(String(projectsResult.reason?.message || 'No se pudieron cargar los proyectos desde el backend.'));
-    }
-
-    if (repositoryResult.status === 'fulfilled') {
-      repositoryProjects = parseProjectsResponse(repositoryResult.value);
-    } else {
-      errors.push(String(repositoryResult.reason?.message || 'No se pudo cargar el repositorio de muestras desde el backend.'));
-    }
-
-    if (baseProjects.length || repositoryProjects.length) {
-      const repositoryById = new Map(
-        repositoryProjects.map((project) => [String(project.id), project])
-      );
-
-      const mergedProjects = baseProjects.map((project) => {
-        const repositoryProject = repositoryById.get(String(project.id));
-
-        if (!repositoryProject) {
-          return project;
-        }
-
-        return {
-          ...project,
-          recentSamplesRaw: repositoryProject.recentSamplesRaw,
-          templatesCount: repositoryProject.templatesCount,
-          associatedSamplesCount:
-            repositoryProject.associatedSamplesCount > 0
-              ? repositoryProject.associatedSamplesCount
-              : project.associatedSamplesCount
-        };
-      });
-
-      const mergedIds = new Set(mergedProjects.map((project) => String(project.id)));
-      const repositoryOnlyProjects = repositoryProjects.filter(
-        (project) => !mergedIds.has(String(project.id)),
-      );
-
-      setProjects([...mergedProjects, ...repositoryOnlyProjects]);
-    } else {
-      setProjects([]);
-    }
-
-    if (clientsResult.status === 'fulfilled') {
-      setClients(parseClientsResponse(clientsResult.value));
-    } else {
-      setClients([]);
-      errors.push(String(clientsResult.reason?.message || 'No se pudieron cargar los clientes desde el backend.'));
-    }
-
-    if (statusesResult.status === 'fulfilled') {
-      setAvailableStatuses(statusesResult.value || []);
-    } else {
-      setAvailableStatuses([]);
-      errors.push(
-        String(
-          statusesResult.reason?.message ||
-            'No se pudieron cargar los estados de los proyectos.',
-        ),
-      );
-    }
-
-    setError(errors.join(' '));
-    setLoading(false);
-  };
-
-  const applyFilters = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const { name, status, fromDate, toDate } = filters;
-      let response;
+      const [projectsResult, repositoryResult, clientsResult, statusesResult] =
+        await Promise.allSettled([
+          apiService.projects.getAll(),
+          apiService.samples.getRepository(),
+          apiService.clients.getAll(),
+          apiService.projects.getAvailableStatuses(),
+        ]);
 
-      if (name) {
-        response = await apiService.projects.searchByName(name);
-      } else if (status) {
-        response = await apiService.projects.filterByStatus(status);
-      } else if (fromDate && toDate) {
-        response = await apiService.projects.filterByDateRange(fromDate, toDate);
+      if (requestVersion !== requestsVersionRef.current) {
+        return;
+      }
+
+      const errors = [];
+      let baseProjects = [];
+      let fetchedRepositoryProjects = [];
+
+      if (projectsResult.status === 'fulfilled') {
+        baseProjects = parseProjectsResponse(projectsResult.value);
       } else {
-        loadPageData();
+        errors.push(String(projectsResult.reason?.message || 'No se pudieron cargar los proyectos desde el backend.'));
+      }
+
+      if (repositoryResult.status === 'fulfilled') {
+        fetchedRepositoryProjects = parseProjectsResponse(repositoryResult.value);
+      } else {
+        errors.push(String(repositoryResult.reason?.message || 'No se pudo cargar el repositorio de muestras desde el backend.'));
+      }
+
+      setRepositoryProjects(fetchedRepositoryProjects);
+
+      setProjects(
+        mergeProjectsWithRepository(baseProjects, fetchedRepositoryProjects, true)
+      );
+
+      if (clientsResult.status === 'fulfilled') {
+        setClients(parseClientsResponse(clientsResult.value));
+      } else {
+        setClients([]);
+        errors.push(String(clientsResult.reason?.message || 'No se pudieron cargar los clientes desde el backend.'));
+      }
+
+      if (statusesResult.status === 'fulfilled') {
+        setAvailableStatuses(statusesResult.value || []);
+      } else {
+        setAvailableStatuses([]);
+        errors.push(
+          String(
+            statusesResult.reason?.message ||
+              'No se pudieron cargar los estados de los proyectos.',
+          ),
+        );
+      }
+
+      setError(errors.join(' '));
+    } finally {
+      if (requestVersion === requestsVersionRef.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const applyFilters = async (nextFilters = filters) => {
+    const normalizedFilters = normalizeProjectFilters(nextFilters);
+
+    if (!hasActiveProjectFilters(normalizedFilters)) {
+      await loadPageData();
+      return;
+    }
+
+    if (
+      normalizedFilters.fromDate &&
+      normalizedFilters.toDate &&
+      normalizedFilters.fromDate > normalizedFilters.toDate
+    ) {
+      requestsVersionRef.current += 1;
+      setLoading(false);
+      setError('La fecha "Desde" no puede ser mayor que la fecha "Hasta".');
+      return;
+    }
+
+    const requestVersion = requestsVersionRef.current + 1;
+    requestsVersionRef.current = requestVersion;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await apiService.projects.getAll(normalizedFilters);
+
+      if (requestVersion !== requestsVersionRef.current) {
         return;
       }
 
       const parsedProjects = parseProjectsResponse(response);
-      setProjects(parsedProjects);
+      setProjects(mergeProjectsWithRepository(parsedProjects, repositoryProjects));
     } catch (err) {
+      if (requestVersion !== requestsVersionRef.current) {
+        return;
+      }
+
       const errorMessage =
         err.response?.data?.message || err.message || 'Fallo al aplicar los cambios';
       setError(errorMessage);
       setProjects([]);
     } finally {
-      setLoading(false);
+      if (requestVersion === requestsVersionRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -603,21 +669,13 @@ export default function ProjectsPage() {
   }, []);
 
   useEffect(() => {
+    if (!hasInitializedFiltersRef.current) {
+      hasInitializedFiltersRef.current = true;
+      return undefined;
+    }
+
     const delayDebounceFn = setTimeout(() => {
-      if (
-        filters.name ||
-        filters.status ||
-        (filters.fromDate && filters.toDate)
-      ) {
-        applyFilters();
-      } else if (
-        !filters.name &&
-        !filters.status &&
-        !filters.fromDate &&
-        !filters.toDate
-      ) {
-        loadPageData();
-      }
+      applyFilters(filters);
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
@@ -836,7 +894,17 @@ export default function ProjectsPage() {
   };
 
   const clearFilters = () => {
+    setError('');
     setFilters(INITIAL_FILTERS);
+  };
+
+  const retryLoad = () => {
+    if (hasActiveProjectFilters(filters)) {
+      applyFilters(filters);
+      return;
+    }
+
+    loadPageData();
   };
 
   return (
@@ -865,27 +933,37 @@ export default function ProjectsPage() {
 
             <div className="mt-6 bg-white p-4 rounded-lg shadow-md">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <input
-                  type="text"
-                  name="name"
-                  value={filters.name}
-                  onChange={handleFilterChange}
-                  placeholder="Buscar por nombre"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                />
-                <select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                >
-                  <option value="">Todos los estados</option>
-                  {availableStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {translateStatus(status)}
-                    </option>
-                  ))}
-                </select>
+                {/* Name search — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <input
+                    type="text"
+                    name="name"
+                    value={filters.name}
+                    onChange={handleFilterChange}
+                    placeholder="Buscar por nombre"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                  />
+                </div>
+
+                {/* Status select — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleFilterChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                  >
+                    <option value="">Todos los estados</option>
+                    {availableStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {translateStatus(status)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="flex flex-col">
                   <label className="text-xs text-gray-500 mb-1">Desde</label>
                   <input
@@ -924,7 +1002,7 @@ export default function ProjectsPage() {
                 <span>{error}</span>
                 <button
                   type="button"
-                  onClick={loadPageData}
+                  onClick={retryLoad}
                   className="inline-flex items-center justify-center px-3! py-1.5! rounded-md border border-red-300 bg-white! text-red-700 hover:bg-red-100! transition-colors"
                 >
                   Retry
@@ -1015,7 +1093,8 @@ export default function ProjectsPage() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-5 md:px-6 py-5 border-b border-gray-200">
+                        {/* ── Project metadata grid ── */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 px-5 md:px-6 py-5 border-b border-gray-200">
                           <div>
                             <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Cliente Principal</p>
                             <p className="text-sm font-semibold text-gray-900 mt-2">{project.clientName || '-'}</p>
@@ -1027,7 +1106,12 @@ export default function ProjectsPage() {
                           </div>
 
                           <div>
-                            <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Fecha Limite</p>
+                            <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Fecha de Creación</p>
+                            <p className="text-sm font-semibold text-gray-900 mt-2">{formatDisplayDate(project.createdAt)}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Fecha Límite</p>
                             <p className="text-sm font-semibold text-gray-900 mt-2">{formatDisplayDate(project.dueDate)}</p>
                           </div>
                         </div>
