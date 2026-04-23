@@ -933,27 +933,37 @@ export default function ProjectsPage() {
 
             <div className="mt-6 bg-white p-4 rounded-lg shadow-md">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <input
-                  type="text"
-                  name="name"
-                  value={filters.name}
-                  onChange={handleFilterChange}
-                  placeholder="Buscar por nombre"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                />
-                <select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                >
-                  <option value="">Todos los estados</option>
-                  {availableStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {translateStatus(status)}
-                    </option>
-                  ))}
-                </select>
+                {/* Name search — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <input
+                    type="text"
+                    name="name"
+                    value={filters.name}
+                    onChange={handleFilterChange}
+                    placeholder="Buscar por nombre"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                  />
+                </div>
+
+                {/* Status select — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleFilterChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                  >
+                    <option value="">Todos los estados</option>
+                    {availableStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {translateStatus(status)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="flex flex-col">
                   <label className="text-xs text-gray-500 mb-1">Desde</label>
                   <input
@@ -1083,7 +1093,8 @@ export default function ProjectsPage() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-5 md:px-6 py-5 border-b border-gray-200">
+                        {/* ── Project metadata grid ── */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 px-5 md:px-6 py-5 border-b border-gray-200">
                           <div>
                             <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Cliente Principal</p>
                             <p className="text-sm font-semibold text-gray-900 mt-2">{project.clientName || '-'}</p>
@@ -1095,7 +1106,12 @@ export default function ProjectsPage() {
                           </div>
 
                           <div>
-                            <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Fecha Limite</p>
+                            <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Fecha de Creación</p>
+                            <p className="text-sm font-semibold text-gray-900 mt-2">{formatDisplayDate(project.createdAt)}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Fecha Límite</p>
                             <p className="text-sm font-semibold text-gray-900 mt-2">{formatDisplayDate(project.dueDate)}</p>
                           </div>
                         </div>

@@ -664,24 +664,34 @@ export default function ClientsPage() {
 
             <div className="mt-6 bg-white p-4 rounded-lg shadow-md">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <input
-                  type="text"
-                  name="name"
-                  value={filters.name}
-                  onChange={handleFilterChange}
-                  placeholder="Buscar por nombre, correo, telefono o direccion"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                />
-                <select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                >
-                  <option value="">Todos los estados</option>
-                  <option value="active">Activo</option>
-                  <option value="inactive">Inactivo</option>
-                </select>
+                {/* Name search — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <input
+                    type="text"
+                    name="name"
+                    value={filters.name}
+                    onChange={handleFilterChange}
+                    placeholder="Buscar por nombre"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+
+                {/* Status select — invisible label keeps height consistent with date columns */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleFilterChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  >
+                    <option value="">Todos los estados</option>
+                    <option value="active">Activo</option>
+                    <option value="inactive">Inactivo</option>
+                  </select>
+                </div>
+
                 <div className="flex flex-col">
                   <label className="text-xs text-gray-500 mb-1">Desde</label>
                   <input
