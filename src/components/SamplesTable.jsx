@@ -700,7 +700,7 @@ export default function SamplesTable() {
 
       resetImportDraft();
     } catch (err) {
-      setImportModalError(err.message || 'No se pudo importar. Verifica si hay codigos de muestra duplicados.');
+      setImportModalError(err.message || 'No se pudo importar. Verifica si hay códigos de muestra duplicados.');
     } finally {
       setImportingProjectId(null);
     }
@@ -1247,7 +1247,7 @@ export default function SamplesTable() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
             <div className="bg-emerald-700 px-6 py-4 flex items-center justify-between text-white">
               <div>
-                <h3 className="text-lg font-bold">Configurar Plantilla Para Importacion</h3>
+                <h3 className="text-lg font-bold">Configurar Plantilla Para Importación</h3>
                 <p className="text-xs text-emerald-100 mt-1">
                   Proyecto: {importDraft.project.name}
                 </p>
@@ -1262,15 +1262,15 @@ export default function SamplesTable() {
 
             <div className="p-6 space-y-5 max-h-[75vh] overflow-auto">
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-4 text-sm">
-                La primera columna <span className="font-black">code</span> se usara para el codigo obligatorio de cada muestra. No se creara un campo nuevo llamado code.
+                La primera columna <span className="font-black">code</span> se usará para el código obligatorio de cada muestra. No se creará un campo nuevo llamado code.
               </div>
 
               {existingTemplateForImport && (
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-sm">
                   La plantilla <span className="font-black">{existingTemplateForImport.name}</span> ya existe en general.
                   {isExistingTemplateAssociatedToProject
-                    ? ' Ya esta asociada a este proyecto: solo se agregaran nuevas muestras a esa plantilla.'
-                    : ' Se usara esta plantilla existente para agregar las muestras.'}
+                    ? ' Ya está asociada a este proyecto: solo se agregarán nuevas muestras a esa plantilla.'
+                    : ' Se usará esta plantilla existente para agregar las muestras.'}
                 </div>
               )}
 
@@ -1294,7 +1294,7 @@ export default function SamplesTable() {
                     }
                   }}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-gray-700"
-                  placeholder="Ej: Plantilla de importacion"
+                  placeholder="Ej: Plantilla de importación"
                 />
               </div>
 

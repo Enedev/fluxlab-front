@@ -61,7 +61,7 @@ export default function TemplatesTable() {
       setTemplates(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error loading templates:', err);
-      setError(err.message || 'Error al cargar los templates');
+      setError(err.message || 'Error al cargar las plantillas');
     } finally {
       setLoading(false);
     }
@@ -110,7 +110,7 @@ export default function TemplatesTable() {
       setTemplateToDelete(null);
     } catch (err) {
       console.error('Error deleting template:', err);
-      setError('Error al eliminar el template');
+      setError('Error al eliminar la plantilla: ' + (err.message || 'Intenta de nuevo más tarde'));
       setShowDeleteModal(false);
     }
   };

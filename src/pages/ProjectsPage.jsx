@@ -1125,7 +1125,7 @@ export default function ProjectsPage() {
                           <table className="w-full min-w-205">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Codigo de Muestra</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Código de Muestra</th>
                                 <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Estado</th>
                                 <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Plantilla</th>
                                 <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Creado En</th>

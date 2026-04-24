@@ -93,7 +93,7 @@ export default function TemplateBuilder({ onSave, onCancel, template = null }) {
       onSave(result);
     } catch (err) {
       console.error('Error saving template:', err);
-      setError(err.message || 'Error al guardar el template');
+      setError(err.message || 'Error al guardar la plantilla');
     } finally {
       setIsSubmitting(false);
     }

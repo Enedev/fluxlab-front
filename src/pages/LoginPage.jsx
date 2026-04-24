@@ -119,10 +119,11 @@ export default function LoginPage() {
 
       // If user is admin, bypass forced password change
       const isAdmin = user?.app_metadata?.role === 'admin' || user?.role === 'admin';
+      const requiresPasswordChange = !isAdmin && user?.passwordChanged !== true;
 
-      if (!isAdmin && user?.passwordChanged === false) {
+      if (requiresPasswordChange) {
         // show modal and DO NOT set global auth yet
-        console.log('passwordChanged false and not admin -> show modal');
+        console.log('User requires password change before continuing -> show modal');
         setShowPasswordChangeModal(true);
         setIsSubmitting(false);
         return;
@@ -303,11 +304,11 @@ export default function LoginPage() {
               </div>
 
               {/* Forgot Password */}
-              <div className="text-right pt-2">
+              {/* <div className="text-right pt-2">
                 <a href="#forgot" className="text-sm text-emerald-600 hover:underline">
                   ¿Olvidaste tu contraseña?
                 </a>
-              </div>
+              </div> */}
 
               {/* Submit Button */}
               <button

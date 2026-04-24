@@ -8,6 +8,15 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+function requiresPasswordChange(user) {
+  if (!user) {
+    return false;
+  }
+
+  const isAdmin = user?.app_metadata?.role === 'admin' || user?.role === 'admin';
+  return !isAdmin && user?.passwordChanged !== true;
+}
+
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
@@ -20,7 +29,7 @@ function LoadingScreen() {
 }
 
 export function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return <LoadingScreen />;
@@ -30,17 +39,21 @@ export function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  if (requiresPasswordChange(user)) {
+    return <Navigate to="/login" replace />;
+  }
+
   return children;
 }
 
 export function PublicOnlyRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return <LoadingScreen />;
   }
 
-  if (isAuthenticated()) {
+  if (isAuthenticated() && !requiresPasswordChange(user)) {
     return <Navigate to="/projects" replace />;
   }
 
