@@ -20,6 +20,7 @@ vi.mock('../../services/api', () => ({
   apiService: {
     projects: {
       getAll: vi.fn(),
+      getAvailableStatuses: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       remove: vi.fn()
@@ -49,6 +50,7 @@ describe('ProjectsPage', () => {
 
     apiService.samples.getRepository.mockResolvedValue([]);
     apiService.clients.getAll.mockResolvedValue([{ id: 'C-1', name: 'BioLabs' }]);
+    apiService.projects.getAvailableStatuses.mockResolvedValue(['active']);
   });
 
   it('renderiza proyectos al cargar datos correctamente', async () => {

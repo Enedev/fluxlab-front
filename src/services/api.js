@@ -378,6 +378,16 @@ export const apiService = {
       return apiRequest(endpoint);
     },
 
+    async getByClient(clientId) {
+      const normalizedClientId = String(clientId || '').trim();
+
+      if (!normalizedClientId) {
+        return this.getAll();
+      }
+
+      return apiRequest(`/samples/client/${normalizedClientId}`);
+    },
+
     async create(sampleData) {
       return apiRequest('/samples', {
         method: 'POST',

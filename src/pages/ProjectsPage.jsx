@@ -15,14 +15,39 @@ const INITIAL_PROJECT_FORM = {
 
 const INITIAL_FILTERS = {
   name: '',
+  clientId: '',
   status: '',
   fromDate: '',
   toDate: '',
 };
 
+const FLUXLAB_CLIENT_NORMALIZED_NAME = 'fluxlab';
+
+function normalizeClientNameForMatch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function getDefaultProjectClientId(clients = []) {
+  if (!Array.isArray(clients) || clients.length === 0) {
+    return '';
+  }
+
+  const fluxLabClient = clients.find(
+    (client) =>
+      normalizeClientNameForMatch(client?.name) === FLUXLAB_CLIENT_NORMALIZED_NAME,
+  );
+
+  return String(fluxLabClient?.id || clients[0]?.id || '').trim();
+}
+
 function normalizeProjectFilters(filters) {
   return {
     name: String(filters?.name || '').trim(),
+    clientId: String(filters?.clientId || '').trim(),
     status: String(filters?.status || '').trim(),
     fromDate: String(filters?.fromDate || '').trim(),
     toDate: String(filters?.toDate || '').trim(),
@@ -34,6 +59,7 @@ function hasActiveProjectFilters(filters) {
 
   return (
     Boolean(normalizedFilters.name) ||
+    Boolean(normalizedFilters.clientId) ||
     Boolean(normalizedFilters.status) ||
     Boolean(normalizedFilters.fromDate) ||
     Boolean(normalizedFilters.toDate)
@@ -743,10 +769,32 @@ export default function ProjectsPage() {
     return expandedProjectSamples.length;
   }, [expandedProject, expandedProjectSamples]);
 
+  useEffect(() => {
+    if (!showProjectModal || projectForm.clientId) {
+      return;
+    }
+
+    const fallbackClientId = getDefaultProjectClientId(clients);
+
+    if (!fallbackClientId) {
+      return;
+    }
+
+    setProjectForm((currentForm) => ({
+      ...currentForm,
+      clientId: fallbackClientId,
+    }));
+  }, [showProjectModal, clients, projectForm.clientId]);
+
   const openCreateModal = () => {
+    const defaultClientId = getDefaultProjectClientId(clients);
+
     setModalMode('create');
     setEditingProjectId(null);
-    setProjectForm(INITIAL_PROJECT_FORM);
+    setProjectForm({
+      ...INITIAL_PROJECT_FORM,
+      clientId: defaultClientId,
+    });
     setProjectFormError('');
     setShowProjectModal(true);
   };
@@ -758,11 +806,16 @@ export default function ProjectsPage() {
         String(project.clientName || '').trim().toLowerCase()
     );
 
+    const resolvedClientId =
+      project.clientId ||
+      matchingClient?.id ||
+      getDefaultProjectClientId(clients);
+
     setModalMode('edit');
     setEditingProjectId(project.id);
     setProjectForm({
       name: project.name || '',
-      clientId: project.clientId || matchingClient?.id || '',
+      clientId: resolvedClientId,
       endDate: formatInputDate(project.endDate || project.dueDate),
       description: project.description || '',
       status: normalizeEditableProjectStatus(project.status)
@@ -790,10 +843,25 @@ export default function ProjectsPage() {
     event.preventDefault();
 
     const trimmedName = projectForm.name.trim();
+    const selectedClientId = String(projectForm.clientId || '').trim();
     const trimmedEndDate = projectForm.endDate.trim();
 
     if (!trimmedName) {
       setProjectFormError('El nombre del proyecto es obligatorio.');
+      return;
+    }
+
+    if (!selectedClientId) {
+      setProjectFormError('Debes seleccionar un cliente para el proyecto.');
+      return;
+    }
+
+    const selectedClientExists = clients.some(
+      (client) => String(client.id || '').trim() === selectedClientId,
+    );
+
+    if (!selectedClientExists) {
+      setProjectFormError('Selecciona un cliente valido para el proyecto.');
       return;
     }
 
@@ -835,7 +903,7 @@ export default function ProjectsPage() {
         description: projectForm.description.trim() || undefined,
         endDate: normalizedEndDate,
         status: normalizedStatus,
-        clientId: projectForm.clientId || undefined
+        clientId: selectedClientId
       };
 
       if (modalMode === 'edit' && editingProjectId) {
@@ -932,7 +1000,7 @@ export default function ProjectsPage() {
             </div>
 
             <div className="mt-6 bg-white p-4 rounded-lg shadow-md">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* Name search — invisible label keeps height consistent with date columns */}
                 <div className="flex flex-col">
                   <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
@@ -944,6 +1012,23 @@ export default function ProjectsPage() {
                     placeholder="Buscar por nombre"
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
                   />
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-xs text-transparent mb-1 select-none" aria-hidden="true">&nbsp;</span>
+                  <select
+                    name="clientId"
+                    value={filters.clientId}
+                    onChange={handleFilterChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                  >
+                    <option value="">Todos los clientes</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Status select — invisible label keeps height consistent with date columns */}
@@ -1247,14 +1332,19 @@ export default function ProjectsPage() {
                   name="clientId"
                   value={projectForm.clientId}
                   onChange={handleProjectFormChange}
+                  required
+                  disabled={!clients.length}
                   className="w-full px-4 py-3 border border-gray-200 rounded-md bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
                 >
-                  <option value="">Selecciona un cliente asociado...</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
+                  {clients.length === 0 ? (
+                    <option value="">No hay clientes disponibles</option>
+                  ) : (
+                    clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -1319,7 +1409,7 @@ export default function ProjectsPage() {
 
                 <button
                   type="submit"
-                  disabled={submittingProject}
+                  disabled={submittingProject || clients.length === 0}
                   className="inline-flex items-center justify-center bg-emerald-500! hover:bg-emerald-600! text-gray-900! hover:text-white! disabled:bg-emerald-300! px-5! py-2.5! rounded-md font-semibold transition-all"
                 >
                   {submittingProject

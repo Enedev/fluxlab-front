@@ -114,6 +114,10 @@ export default function UserManagementPage() {
 
   // Open delete modal
   function handleOpenDeleteModal(user) {
+    if (String(user?.role || '').toLowerCase() === 'admin') {
+      return;
+    }
+
     setUserToDelete(user);
     setShowDeleteModal(true);
   }
@@ -434,16 +438,18 @@ export default function UserManagementPage() {
                                       Editar
                                     </span>
                                   </button>
-                                  <button
-                                    onClick={() => handleOpenDeleteModal(user)}
-                                    disabled={loading}
-                                    className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded disabled:bg-gray-200 disabled:text-gray-400 transition"
-                                  >
-                                    <span className="inline-flex items-center gap-1">
-                                      <Icon icon={faTrashCan} size={12} color="currentColor" />
-                                      Eliminar
-                                    </span>
-                                  </button>
+                                  {String(user?.role || '').toLowerCase() !== 'admin' && (
+                                    <button
+                                      onClick={() => handleOpenDeleteModal(user)}
+                                      disabled={loading}
+                                      className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded disabled:bg-gray-200 disabled:text-gray-400 transition"
+                                    >
+                                      <span className="inline-flex items-center gap-1">
+                                        <Icon icon={faTrashCan} size={12} color="currentColor" />
+                                        Eliminar
+                                      </span>
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

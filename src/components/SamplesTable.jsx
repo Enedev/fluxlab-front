@@ -5,7 +5,7 @@
  * Integrates with Inline Editing, Quick Add, and a traditional Creation Modal
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   faCheck,
   faFileLines,
@@ -17,18 +17,22 @@ import {
   faXmark
 } from '@fortawesome/free-solid-svg-icons';
 import { apiService } from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
 import * as XLSX from 'xlsx';
 
 export default function SamplesTable() {
   const MAX_IMPORT_FILE_BYTES = 20 * 1024 * 1024;
+  const INITIAL_SAMPLE_FILTERS = {
+    clientId: '',
+    fromDate: '',
+    toDate: ''
+  };
 
-  const { user } = useAuth();
   const fileInputRefs = useRef({});
   const [samples, setSamples] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [importMessage, setImportMessage] = useState(null);
@@ -42,6 +46,7 @@ export default function SamplesTable() {
   // Inline Editing State
   const [editingId, setEditingId] = useState(null);
   const [editFormData, setEditFormData] = useState({
+    code: '',
     status: '',
     fieldValues: {}
   });
@@ -57,6 +62,7 @@ export default function SamplesTable() {
   const [sampleToDelete, setSampleToDelete] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState(INITIAL_SAMPLE_FILTERS);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -77,8 +83,6 @@ export default function SamplesTable() {
     templateId: '',
     status: 'pending'
   });
-
-  const [allSamples, setAllSamples] = useState([]);
 
   const showImportConfirmation = (message) => {
     return new Promise((resolve) => {
@@ -111,6 +115,86 @@ export default function SamplesTable() {
   };
 
   const normalizeFieldKey = (value) => normalizeText(value).replace(/\s+/g, '');
+
+  const parseCollection = (payload, keys = []) => {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    for (const key of keys) {
+      if (Array.isArray(payload?.[key])) {
+        return payload[key];
+      }
+    }
+
+    if (Array.isArray(payload?.data)) {
+      return payload.data;
+    }
+
+    if (Array.isArray(payload?.data?.items)) {
+      return payload.data.items;
+    }
+
+    return [];
+  };
+
+  const parseClientsResponse = (payload) => {
+    const rawClients = parseCollection(payload, ['clients', 'items', 'results']);
+
+    return rawClients
+      .map((rawClient, index) => ({
+        id:
+          rawClient?.id ||
+          rawClient?._id ||
+          rawClient?.uuid ||
+          `client-${index + 1}`,
+        name:
+          rawClient?.name ||
+          rawClient?.clientName ||
+          rawClient?.companyName ||
+          rawClient?.organization ||
+          `Cliente ${index + 1}`
+      }))
+      .sort((leftClient, rightClient) =>
+        String(leftClient.name || '').localeCompare(String(rightClient.name || ''), 'es', {
+          sensitivity: 'base'
+        })
+      );
+  };
+
+  const formatLocalDateForInput = (date) => {
+    const year = String(date.getFullYear());
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const getDatePartFromValue = (value) => {
+    const rawValue = String(value || '').trim();
+
+    if (!rawValue) {
+      return '';
+    }
+
+    const datePartMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+    if (datePartMatch) {
+      return `${datePartMatch[1]}-${datePartMatch[2]}-${datePartMatch[3]}`;
+    }
+
+    const parsedDate = new Date(rawValue);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return '';
+    }
+
+    const year = String(parsedDate.getUTCFullYear());
+    const month = String(parsedDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(parsedDate.getUTCDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
 
   const buildFieldSignature = (fields = []) => {
     return fields
@@ -321,18 +405,42 @@ export default function SamplesTable() {
     throw new Error('Formato no soportado. Solo se aceptan archivos .csv o .xlsx.');
   };
 
-  // Load samples and templates on component mount
-  useEffect(() => {
-    loadData();
-  }, []);
+  const filterDateMax = useMemo(() => formatLocalDateForInput(new Date()), []);
 
-  const loadData = async () => {
+  const filterError = useMemo(() => {
+    if (filters.fromDate && filters.toDate && filters.fromDate > filters.toDate) {
+      return 'La fecha "Desde" no puede ser mayor que la fecha "Hasta".';
+    }
+
+    return '';
+  }, [filters.fromDate, filters.toDate]);
+
+  const hasActiveFilters = useMemo(() => {
+    return Boolean(
+      String(searchQuery || '').trim() ||
+      filterStatus !== 'all' ||
+      filters.clientId ||
+      filters.fromDate ||
+      filters.toDate
+    );
+  }, [searchQuery, filterStatus, filters.clientId, filters.fromDate, filters.toDate]);
+
+  // Load data on mount and whenever client filter changes.
+  useEffect(() => {
+    loadData(filters.clientId);
+  }, [filters.clientId]);
+
+  const loadData = async (clientId = '') => {
+    const normalizedClientId = String(clientId || '').trim();
+
     try {
       setLoading(true);
       setError(null);
       
-      const [samplesData, templatesData, projectsResponse] = await Promise.all([
-        apiService.samples.getAll().catch(err => {
+      const [samplesData, templatesData, projectsResponse, clientsResponse] = await Promise.all([
+        (normalizedClientId
+          ? apiService.samples.getByClient(normalizedClientId)
+          : apiService.samples.getAll()).catch(err => {
           console.error('Error fetching samples:', err);
           return [];
         }),
@@ -340,16 +448,24 @@ export default function SamplesTable() {
           console.error('Error fetching templates:', err);
           return [];
         }),
-        apiService.projects.getAll().catch(err => {
+        apiService.projects.getAll(
+          normalizedClientId
+            ? { clientId: normalizedClientId }
+            : {}
+        ).catch(err => {
           console.error('Error fetching projects:', err);
+          return [];
+        }),
+        apiService.clients.getAll().catch(err => {
+          console.error('Error fetching clients:', err);
           return [];
         })
       ]);
 
       const samplesArray = Array.isArray(samplesData) ? samplesData : [];
       setSamples(samplesArray);
-      setAllSamples(samplesArray);
       setTemplates(Array.isArray(templatesData) ? templatesData : []);
+      setClients(parseClientsResponse(clientsResponse));
       
       const projectsList = projectsResponse?.data && Array.isArray(projectsResponse.data) 
         ? projectsResponse.data 
@@ -382,6 +498,7 @@ export default function SamplesTable() {
     });
 
     setEditFormData({
+      code: sample.code || '',
       status: sample.status,
       fieldValues: initialFieldValues
     });
@@ -389,21 +506,27 @@ export default function SamplesTable() {
 
   const cancelEditing = () => {
     setEditingId(null);
-    setEditFormData({ status: '', fieldValues: {} });
+    setEditFormData({ code: '', status: '', fieldValues: {} });
   };
 
   const handleSearch = (query) => {
     setSearchQuery(query);
-    
-    if (query.trim() === '') {
-      setSamples(allSamples);
-    } else {
-      const normalizedQuery = normalizeText(query);
-      const filtered = allSamples.filter(sample => 
-        normalizeText(sample.code).includes(normalizedQuery)
-      );
-      setSamples(filtered);
-    }
+  };
+
+  const handleSampleFilterChange = (event) => {
+    const { name, value } = event.target;
+
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      [name]: value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters(INITIAL_SAMPLE_FILTERS);
+    setSearchQuery('');
+    setFilterStatus('all');
+    setError(null);
   };
 
   const saveInlineEdit = async (event, sample) => {
@@ -415,6 +538,12 @@ export default function SamplesTable() {
 
     setIsSubmitting(true);
     try {
+      const normalizedCode = String(editFormData.code || '').trim();
+
+      if (!normalizedCode) {
+        throw new Error('El código de la muestra es obligatorio.');
+      }
+
       const template = templates.find(t => t.id === (sample.template?.id || sample.templateId));
       const payload = {
         status: editFormData.status,
@@ -430,6 +559,11 @@ export default function SamplesTable() {
         })
       };
 
+      await apiService.samples.update(sample.id, {
+        code: normalizedCode,
+        status: editFormData.status
+      });
+
       const updatedSample = await apiService.samples.updateWithValues(sample.id, payload);
 
       setSamples((prevSamples) => prevSamples.map((existingSample) => {
@@ -438,6 +572,7 @@ export default function SamplesTable() {
         if (!updatedSample || typeof updatedSample !== 'object') {
           return {
             ...existingSample,
+            code: normalizedCode,
             status: payload.status,
           };
         }
@@ -488,7 +623,7 @@ export default function SamplesTable() {
         values: initialValues
       });
       
-      await loadData();
+      await loadData(filters.clientId);
       setShowCreateModal(false);
       setCreateFormData({ code: '', projectId: '', templateId: '', status: 'pending' });
     } catch (err) {
@@ -676,7 +811,7 @@ export default function SamplesTable() {
 
     await apiService.samples.createManyWithValues({ samples: samplesPayload });
 
-    await loadData();
+    await loadData(filters.clientId);
     setImportMessage(
       `Se importaron ${samplesPayload.length} muestras en el proyecto "${project.name}" con la plantilla "${template.name}".`
     );
@@ -927,17 +1062,26 @@ export default function SamplesTable() {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('es-ES', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (e) { return 'Fecha inválida'; }
+    const datePart = getDatePartFromValue(dateString);
+
+    if (!datePart) {
+      return 'N/A';
+    }
+
+    const [year, month, day] = datePart.split('-').map((value) => Number(value));
+
+    if (!year || !month || !day) {
+      return 'Fecha invalida';
+    }
+
+    const utcDate = new Date(Date.UTC(year, month - 1, day));
+
+    return utcDate.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'UTC'
+    });
   };
 
   const getFieldTypeLabel = (dataType) => {
@@ -950,24 +1094,80 @@ export default function SamplesTable() {
     }
   };
 
-  const filteredSamples = (samples || []).filter(s => 
-    filterStatus === 'all' || s.status === filterStatus
+  const filteredSamples = useMemo(() => {
+    if (filterError) {
+      return [];
+    }
+
+    const normalizedQuery = normalizeText(searchQuery);
+
+    return (samples || []).filter((sample) => {
+      if (filterStatus !== 'all' && sample.status !== filterStatus) {
+        return false;
+      }
+
+      if (normalizedQuery && !normalizeText(sample.code).includes(normalizedQuery)) {
+        return false;
+      }
+
+      if (!filters.fromDate && !filters.toDate) {
+        return true;
+      }
+
+      const sampleCreatedDate = getDatePartFromValue(sample.createdAt);
+
+      if (!sampleCreatedDate) {
+        return false;
+      }
+
+      if (filters.fromDate && sampleCreatedDate < filters.fromDate) {
+        return false;
+      }
+
+      if (filters.toDate && sampleCreatedDate > filters.toDate) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [samples, filterStatus, searchQuery, filters.fromDate, filters.toDate, filterError]);
+
+  const shouldHideProjectsWithoutSamples = Boolean(
+    String(searchQuery || '').trim() ||
+    filterStatus !== 'all' ||
+    filters.fromDate ||
+    filters.toDate
   );
 
-  const groupedDataByProject = projects.map(project => {
-    const projectSamples = filteredSamples.filter(s => 
-      s.project?.id === project.id || (s.project && s.project.id === project.id) || s.projectId === project.id
-    );
-
-    const projectTemplates = templates.map(template => {
-      const templateSamples = projectSamples.filter(s => 
-        s.template?.id === template.id || (s.template && s.template.id === template.id) || s.templateId === template.id
+  const groupedDataByProject = useMemo(() => {
+    const groupedProjects = projects.map((project) => {
+      const projectSamples = filteredSamples.filter((sample) =>
+        sample.project?.id === project.id ||
+        (sample.project && sample.project.id === project.id) ||
+        sample.projectId === project.id
       );
-      return { ...template, samples: templateSamples };
-    }).filter(t => t.samples.length > 0);
 
-    return { ...project, templates: projectTemplates, totalSamples: projectSamples.length };
-  });
+      const projectTemplates = templates
+        .map((template) => {
+          const templateSamples = projectSamples.filter((sample) =>
+            sample.template?.id === template.id ||
+            (sample.template && sample.template.id === template.id) ||
+            sample.templateId === template.id
+          );
+
+          return { ...template, samples: templateSamples };
+        })
+        .filter((template) => template.samples.length > 0);
+
+      return { ...project, templates: projectTemplates, totalSamples: projectSamples.length };
+    });
+
+    if (!shouldHideProjectsWithoutSamples) {
+      return groupedProjects;
+    }
+
+    return groupedProjects.filter((project) => project.totalSamples > 0);
+  }, [projects, templates, filteredSamples, shouldHideProjectsWithoutSamples]);
 
   const existingTemplateByNameForImport = showImportTemplateModal
     ? templates.find(
@@ -1025,23 +1225,16 @@ export default function SamplesTable() {
       )}
 
       {/* Header Controls */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 border-l-4 border-teal-500 pl-3">Muestras</h2>
-          <p className="text-xs text-gray-500 pl-3 mt-1 font-bold">{samples.length} muestras en total</p>
-        </div>
-        
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
-          <div className="flex-1 md:flex-none md:w-64">
-            <input
-              type="text"
-              placeholder="Buscar por código de muestra..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
-            />
+      <div className="space-y-4 mb-4">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 border-l-4 border-teal-500 pl-3">Muestras</h2>
+            <p className="text-xs text-gray-500 pl-3 mt-1 font-bold">
+              {filteredSamples.length} de {samples.length} muestras
+            </p>
           </div>
-          <button 
+
+          <button
             type="button"
             onClick={() => setShowCreateModal(true)}
             className="whitespace-nowrap bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium text-sm flex items-center gap-2 shadow-sm"
@@ -1049,7 +1242,79 @@ export default function SamplesTable() {
             <span>+</span> Crear Muestra
           </button>
         </div>
+
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <input
+              type="text"
+              placeholder="Buscar por código de muestra..."
+              value={searchQuery}
+              onChange={(event) => handleSearch(event.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            />
+
+            <select
+              value={filterStatus}
+              onChange={(event) => setFilterStatus(event.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            >
+              <option value="all">Todos los estados</option>
+              <option value="pending">Pendiente</option>
+              <option value="completed">Completada</option>
+              <option value="rejected">Rechazada</option>
+            </select>
+
+            <select
+              name="clientId"
+              value={filters.clientId}
+              onChange={handleSampleFilterChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            >
+              <option value="">Todos los clientes</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              name="fromDate"
+              value={filters.fromDate}
+              onChange={handleSampleFilterChange}
+              max={filterDateMax}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            />
+
+            <input
+              type="date"
+              name="toDate"
+              value={filters.toDate}
+              onChange={handleSampleFilterChange}
+              max={filterDateMax}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            />
+          </div>
+
+          <div className="flex justify-end mt-3">
+            <button
+              type="button"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className="text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
       </div>
+
+      {filterError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          {filterError}
+        </div>
+      )}
 
       {groupedDataByProject.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center mt-6">
@@ -1144,7 +1409,22 @@ export default function SamplesTable() {
                             return (
                               <tr key={sample.id} className={`${isEditingCurrent ? "bg-teal-50/30" : "hover:bg-slate-50/50"} transition`}>
                                 <td className="px-6 py-4 font-mono text-xs font-bold text-teal-600">
-                                  {sample.code}
+                                  {isEditingCurrent ? (
+                                    <input
+                                      type="text"
+                                      className="w-full text-xs font-bold text-slate-900 border border-teal-200 rounded px-2 py-1 bg-white"
+                                      value={editFormData.code}
+                                      onChange={(event) =>
+                                        setEditFormData({
+                                          ...editFormData,
+                                          code: event.target.value,
+                                        })
+                                      }
+                                      placeholder="Codigo de muestra"
+                                    />
+                                  ) : (
+                                    sample.code
+                                  )}
                                 </td>
                                 <td className="px-6 py-4">
                                   {isEditingCurrent ? (

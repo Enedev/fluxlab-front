@@ -74,6 +74,9 @@ export default function TemplateBuilder({ onSave, onCancel, template = null }) {
         name: formData.name,
         description: formData.description,
         fields: formData.fields.map((f, index) => ({
+          ...(typeof f.id === 'string' && f.id.trim()
+            ? { id: f.id.trim() }
+            : {}),
           name: f.name,
           dataType: f.dataType, // text, number, date, boolean
           required: Boolean(f.required),
