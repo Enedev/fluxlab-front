@@ -22,6 +22,8 @@ import Icon from './Icon';
 import * as XLSX from 'xlsx';
 
 export default function SamplesTable() {
+  const MAX_IMPORT_FILE_BYTES = 20 * 1024 * 1024;
+
   const { user } = useAuth();
   const fileInputRefs = useRef({});
   const [samples, setSamples] = useState([]);
@@ -47,6 +49,11 @@ export default function SamplesTable() {
   // Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const confirmResolverRef = useRef(null);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    message: ''
+  });
   const [sampleToDelete, setSampleToDelete] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,6 +80,28 @@ export default function SamplesTable() {
 
   const [allSamples, setAllSamples] = useState([]);
 
+  const showImportConfirmation = (message) => {
+    return new Promise((resolve) => {
+      confirmResolverRef.current = resolve;
+      setConfirmDialog({
+        open: true,
+        message: String(message || '')
+      });
+    });
+  };
+
+  const resolveImportConfirmation = (accepted) => {
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(Boolean(accepted));
+      confirmResolverRef.current = null;
+    }
+
+    setConfirmDialog({
+      open: false,
+      message: ''
+    });
+  };
+
   const normalizeText = (value) => {
     return String(value || '')
       .normalize('NFD')
@@ -82,6 +111,49 @@ export default function SamplesTable() {
   };
 
   const normalizeFieldKey = (value) => normalizeText(value).replace(/\s+/g, '');
+
+  const buildFieldSignature = (fields = []) => {
+    return fields
+      .map((field) => ({
+        name: normalizeFieldKey(field?.name),
+        rawName: String(field?.name || '')
+      }))
+      .filter((field) => field.name && field.name !== 'code' && field.rawName.trim() !== '')
+      .map((field) => field.name)
+      .join('||');
+  };
+
+  const getTemplateFieldSignature = (template) => {
+    if (!Array.isArray(template?.fields) || template.fields.length === 0) {
+      return '';
+    }
+
+    return buildFieldSignature(template.fields);
+  };
+
+  const resolveTemplateWithFields = async (template) => {
+    if (!template) return null;
+
+    if (Array.isArray(template.fields) && template.fields.length > 0) {
+      return template;
+    }
+
+    return apiService.templates.getById(template.id);
+  };
+
+  const findTemplateWithMatchingFields = async (fields) => {
+    const targetSignature = buildFieldSignature(fields);
+    if (!targetSignature) return null;
+
+    for (const template of templates) {
+      const resolvedTemplate = await resolveTemplateWithFields(template);
+      if (buildFieldSignature(resolvedTemplate?.fields || []) === targetSignature) {
+        return resolvedTemplate;
+      }
+    }
+
+    return null;
+  };
 
   const isCsvFile = (fileName) => String(fileName || '').toLowerCase().endsWith('.csv');
   const isXlsxFile = (fileName) => String(fileName || '').toLowerCase().endsWith('.xlsx');
@@ -632,48 +704,48 @@ export default function SamplesTable() {
         (template) => normalizeFieldKey(template.name) === normalizeFieldKey(name)
       );
 
-      if (existingTemplateByName) {
-        const projectHasTemplate = samples.some(
-          (sample) =>
-            (sample.project?.id || sample.projectId) === importDraft.project.id &&
-            (sample.template?.id || sample.templateId) === existingTemplateByName.id
+      const matchingTemplateByFields = await findTemplateWithMatchingFields(importFieldSettings);
+
+      if (matchingTemplateByFields) {
+        const shouldAddSamplesToExistingTemplate = await showImportConfirmation(
+          `La plantilla "${matchingTemplateByFields.name}" ya existe. ¿Estas seguro de agregar solo las muestras a esta plantilla?`
         );
 
-        window.alert(`La plantilla "${existingTemplateByName.name}" ya existe en el sistema.`);
-
-        if (projectHasTemplate) {
-          window.alert('Esta plantilla ya esta asociada al proyecto. Solo se agregaran nuevas muestras.');
-        }
-
-        const shouldUseExistingTemplate = window.confirm(
-          `La plantilla "${existingTemplateByName.name}" ya existe. ¿Deseas agregar las muestras a esta plantilla?`
-        );
-
-        if (!shouldUseExistingTemplate) {
-          setImportModalError('Importacion cancelada: no se agregaron muestras.');
+        if (!shouldAddSamplesToExistingTemplate) {
+          setImportModalError('Importacion cancelada por el usuario.');
           return;
         }
-
-        const resolvedExistingTemplate = Array.isArray(existingTemplateByName?.fields) && existingTemplateByName.fields.length > 0
-          ? existingTemplateByName
-          : await apiService.templates.getById(existingTemplateByName.id);
 
         await runBulkImport({
           project: importDraft.project,
           rows: importDraft.rows,
-          template: resolvedExistingTemplate
+          template: matchingTemplateByFields
         });
 
         resetImportDraft();
         return;
       }
 
-      const shouldCreateTemplate = window.confirm(
-        `No existe una plantilla llamada "${name}". ¿Deseas crearla e importar las muestras?`
+      if (existingTemplateByName) {
+        const resolvedTemplateByName = await resolveTemplateWithFields(existingTemplateByName);
+        const importedFieldsSignature = buildFieldSignature(importFieldSettings);
+        const existingFieldsSignature = buildFieldSignature(resolvedTemplateByName?.fields || []);
+
+        if (importedFieldsSignature && existingFieldsSignature && importedFieldsSignature !== existingFieldsSignature) {
+          setImportModalError(
+            `Ya existe una plantilla llamada "${resolvedTemplateByName.name}" pero tiene campos diferentes. ` +
+            'Cambia el nombre de la plantilla importada o usa un archivo con la misma estructura.'
+          );
+          return;
+        }
+      }
+
+      const shouldCreateNewTemplate = await showImportConfirmation(
+        `Se creara una plantilla nueva llamada "${name}". ¿Deseas continuar?`
       );
 
-      if (!shouldCreateTemplate) {
-        setImportModalError('Importacion cancelada: plantilla no creada.');
+      if (!shouldCreateNewTemplate) {
+        setImportModalError('Importacion cancelada por el usuario.');
         return;
       }
 
@@ -716,6 +788,11 @@ export default function SamplesTable() {
     setImportingProjectId(project.id);
 
     try {
+      if (file.size > MAX_IMPORT_FILE_BYTES) {
+        const fileSizeInMb = (file.size / (1024 * 1024)).toFixed(2);
+        throw new Error(`El archivo pesa ${fileSizeInMb} MB y excede el límite de 20 MB.`);
+      }
+
       const fileNameWithoutExtension = file.name.replace(/\.[^/.]+$/, '').trim();
       const suggestedTemplateName = fileNameWithoutExtension || `Plantilla ${project.name}`;
 
@@ -892,16 +969,37 @@ export default function SamplesTable() {
     return { ...project, templates: projectTemplates, totalSamples: projectSamples.length };
   });
 
-  const existingTemplateForImport = showImportTemplateModal
+  const existingTemplateByNameForImport = showImportTemplateModal
     ? templates.find(
       (template) => normalizeFieldKey(template.name) === normalizeFieldKey(importTemplateName)
     )
     : null;
 
-  const isExistingTemplateAssociatedToProject = Boolean(existingTemplateForImport && importDraft && samples.some(
+  const importFieldSignature = showImportTemplateModal
+    ? buildFieldSignature(importFieldSettings)
+    : '';
+
+  const existingTemplateByFieldsForImport = showImportTemplateModal && importFieldSignature
+    ? templates.find(
+      (template) => getTemplateFieldSignature(template) === importFieldSignature
+    )
+    : null;
+
+  const nameTemplateFieldSignature = getTemplateFieldSignature(existingTemplateByNameForImport);
+
+  const hasKnownNameConflict = Boolean(
+    existingTemplateByNameForImport &&
+    nameTemplateFieldSignature &&
+    importFieldSignature &&
+    nameTemplateFieldSignature !== importFieldSignature
+  );
+
+  const templatePreferredForImport = existingTemplateByFieldsForImport || existingTemplateByNameForImport;
+
+  const isExistingTemplateAssociatedToProject = Boolean(templatePreferredForImport && importDraft && samples.some(
     (sample) =>
       (sample.project?.id || sample.projectId) === importDraft.project.id &&
-      (sample.template?.id || sample.templateId) === existingTemplateForImport.id
+      (sample.template?.id || sample.templateId) === templatePreferredForImport.id
   ));
 
   if (loading) {
@@ -1261,16 +1359,31 @@ export default function SamplesTable() {
             </div>
 
             <div className="p-6 space-y-5 max-h-[75vh] overflow-auto">
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-4 text-sm">
-                La primera columna <span className="font-black">code</span> se usará para el código obligatorio de cada muestra. No se creará un campo nuevo llamado code.
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-3 py-2 text-xs">
+                <span className="font-black">Aviso:</span> la columna <span className="font-black">code</span> es obligatoria y no crea un campo nuevo. Tamaño máximo: <span className="font-black">20 MB</span>.
               </div>
 
-              {existingTemplateForImport && (
+              {existingTemplateByNameForImport && !hasKnownNameConflict && (
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-sm">
-                  La plantilla <span className="font-black">{existingTemplateForImport.name}</span> ya existe en general.
+                  La plantilla <span className="font-black">{existingTemplateByNameForImport.name}</span> ya existe en general.
                   {isExistingTemplateAssociatedToProject
                     ? ' Ya está asociada a este proyecto: solo se agregarán nuevas muestras a esa plantilla.'
                     : ' Se usará esta plantilla existente para agregar las muestras.'}
+                </div>
+              )}
+
+              {existingTemplateByFieldsForImport && (
+                <div className="bg-cyan-50 border border-cyan-200 text-cyan-800 rounded-lg p-4 text-sm">
+                  Ya existe una plantilla con los mismos campos importados:
+                  {' '}<span className="font-black">{existingTemplateByFieldsForImport.name}</span>.
+                  {' '}Se usará esta plantilla para importar las muestras y evitar duplicados.
+                </div>
+              )}
+
+              {hasKnownNameConflict && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-lg p-4 text-sm font-semibold">
+                  Ya existe una plantilla con ese nombre, pero sus campos no coinciden con los del archivo.
+                  Cambia el nombre para crear una nueva plantilla o usa un archivo con la misma estructura.
                 </div>
               )}
 
@@ -1346,14 +1459,16 @@ export default function SamplesTable() {
                 <button
                   type="button"
                   onClick={confirmTemplateFromDraft}
-                  disabled={importingProjectId === importDraft.project.id}
+                  disabled={importingProjectId === importDraft.project.id || hasKnownNameConflict}
                   className="flex-1 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-200 transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <Icon icon={faFloppyDisk} size={14} color="currentColor" />
                   {importingProjectId === importDraft.project.id
                     ? 'Importando...'
-                    : existingTemplateForImport
-                      ? 'Agregar Muestras a Plantilla Existente'
+                    : existingTemplateByFieldsForImport
+                      ? 'Agregar Muestras a Plantilla con Mismos Campos'
+                      : hasKnownNameConflict
+                        ? 'Cambia el Nombre para Continuar'
                       : 'Crear Plantilla e Importar'}
                 </button>
               </div>
@@ -1483,6 +1598,45 @@ export default function SamplesTable() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold transition">No, volver</button>
               <button onClick={confirmDelete} className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold transition">Sí, eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Confirmation Modal */}
+      {confirmDialog.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-emerald-600 px-6 py-4 text-white">
+              <h3 className="text-lg font-bold">Confirmar Importación</h3>
+            </div>
+
+            <div className="p-6">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-emerald-900 text-sm leading-relaxed">
+                <div className="flex items-start gap-3">
+                  <div className="bg-emerald-100 text-emerald-700 w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                    <Icon icon={faTriangleExclamation} size={14} color="currentColor" />
+                  </div>
+                  <p className="font-semibold">{confirmDialog.message}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => resolveImportConfirmation(false)}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => resolveImportConfirmation(true)}
+                  className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition"
+                >
+                  Confirmar
+                </button>
+              </div>
             </div>
           </div>
         </div>
